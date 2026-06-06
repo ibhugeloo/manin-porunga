@@ -209,24 +209,86 @@ tests/       ← doctrine scenarios — the persona's rules are *tested*, not ju
 
 ## Getting started
 
-> Requires [Claude Code](https://claude.com/claude-code). Built and daily-driven on macOS.
-> You don't need Leo, Alfred, Notion, or a homelab to start — just Obsidian + Claude Code.
+Two paths below. If you write code, jump to **For developers**. If you don't — or your
+friend doesn't — follow **The gentle path**. It gets you a working butler in your terminal
+that remembers you, *without* the phone/server parts (those are advanced).
+
+> **Real talk before you start.** This runs on a **Mac**, needs a **paid Anthropic account**
+> (Claude Code), and you'll **copy-paste a few Terminal commands**. If you've never opened
+> Terminal, that's fine — just follow exactly, and budget ~45 minutes. You do **not** need
+> Leo (the phone agent), Alfred, a homelab, or any routine to start. Ignore all of that for now.
+
+### The gentle path (no coding required, macOS)
+
+**What you'll have at the end:** you type `claude` in a folder, and your assistant already
+knows who you are, your tone rules, and remembers things between conversations.
+
+**1. Install the two apps**
+- [Obsidian](https://obsidian.md) — a free note-taking app. This becomes your assistant's
+  memory (and yours). Install it like any app.
+- [Claude Code](https://claude.com/claude-code) — Anthropic's assistant for your terminal.
+  Follow their installer and sign in (this is the paid part).
+
+**2. Download this template (no git needed)**
+- On this page, click the green **`Code`** button → **Download ZIP**.
+- Unzip it. Move the folder somewhere you'll find again, e.g. your **Documents** folder.
+- Rename it to something simple like `my-jarvis` if you want.
+
+**3. Open Terminal in that folder**
+- In Finder, right-click the folder → **Services** → **New Terminal at Folder**.
+  (A black window opens — that's Terminal. You'll paste two commands into it.)
+
+**4. Turn the blank templates into your files**
+Copy this, paste it into Terminal, press Enter (no need to understand it):
+```bash
+for f in memory/*.example.md;   do cp "$f" "${f%.example.md}.md"; done
+for f in config/*.example.yaml; do cp "$f" "${f%.example.yaml}.yaml"; done
+```
+This just makes editable copies of the example files.
+
+**5. Make it *yours* (the important part — and the easy part)**
+- Open Obsidian → **Open folder as vault** → pick your `my-jarvis` folder.
+- Edit two files, in plain words:
+  - `memory/jarvis_soul.md` — how you want it to talk to you (formal? casual? blunt?), and
+    how much it's allowed to do on its own vs. ask you first.
+  - `memory/profil.md` — who you are: your work, your goals, your preferences, what to never
+    forget. Write it like you'd brief a new personal assistant.
+- The more honest and specific you are here, the better it gets. This is the part no software
+  can do for you.
+
+**6. Switch it on**
+Back in Terminal, paste this and press Enter:
+```bash
+./bootstrap.sh
+```
+This wires your files into Claude Code (safe to read first if you're curious — it's just
+setup). Then start it:
+```bash
+claude
+```
+Say hi. Ask it *"what do you know about me?"* — it should answer from your profile. 🎉
+
+**7. Grow into it, slowly**
+Don't turn on anything else yet. Use it by hand for a week or two. When you catch yourself
+wishing it did something on a schedule (a morning brief, etc.), *then* turn on that one
+routine. The phone agent (Leo), the sysadmin (Alfred) and the homelab setup are **advanced
+add-ons** — open [`docs/`](./docs) only when you actually want them.
+
+### For developers
 
 ```bash
 git clone https://github.com/ibhugeloo/manin-jarvis.git
 cd manin-jarvis
-
-# 1. Turn the templates into your real doctrine
 for f in memory/*.example.md;   do cp "$f" "${f%.example.md}.md"; done
 for f in config/*.example.yaml; do cp "$f" "${f%.example.yaml}.yaml"; done
-
-# 2. Fill them in — start with memory/jarvis_soul.md (tone + autonomy) and memory/profil.md
-# 3. Point them at YOUR Obsidian vault path, wire the @imports, then install
+# Fill in memory/*.md + config/*.yaml, point @imports at your vault path:
 ./bootstrap.sh
 ```
+`bootstrap.sh` symlinks `bin/` into `~/.local/bin`, wires the Claude Code hooks, and
+(optionally) installs the launchd routines. Idempotent — re-run to update.
 
-**Start minimal.** Fill the SOUL and profile, skip every automatic routine, run things by hand
-for two weeks. Automate a routine only once you catch yourself running it daily.
+> **Not on a Mac?** The engine assumes macOS (launchd, `~/.local/bin`, shell hooks). Linux
+> works with minor tweaks; Windows needs WSL — both are advanced and undocumented for now.
 
 ---
 
