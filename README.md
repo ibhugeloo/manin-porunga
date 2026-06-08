@@ -37,12 +37,12 @@
 ```mermaid
 flowchart TD
     Me(["👤 Me — edit as a human"]) -->|write| V["🗂️ Obsidian vault (.md)<br/>atelier + live memory"]
-    V -->|"@import (HOT files)"| J["🤖 JARVIS<br/>Claude Code · Mac<br/>builder"]
-    V -->|"memory-sync · nightly mirror"| G[("🔒 git repo = THE CANON<br/>dated · versioned · append-only")]
-    G -->|read-only clone| L["📱 LEO<br/>Hermes · phone<br/>contrarian"]
-    G -.->|read-only| A["🖥️ ALFRED<br/>homelab · sysadmin"]
-    J <-->|debate · I decide| L
-    J -->|session recaps| N["📓 Notion<br/>mirror · mobile · optional"]
+    V -->|"@import · HOT"| J["🤖 JARVIS<br/>Claude Code · Mac · builder"]
+    V -->|"memory-sync · nightly"| G[("🔒 git = THE CANON<br/>dated · versioned · append-only")]
+    J -->|"session recaps"| N["📓 Notion<br/>mirror · optional"]
+    J <-->|"debate · I decide"| L["📱 LEO<br/>Hermes · phone · contrarian"]
+    G -->|"read-only clone"| L
+    G -.->|"read-only"| A["🖥️ ALFRED<br/>homelab · sysadmin"]
     classDef canon fill:#1f2937,stroke:#f59e0b,color:#fff;
     class G canon;
 ```
