@@ -351,18 +351,23 @@ macOS-first by design. No build step, no framework lock-in.
 The full, actionable list: [**BEST-PRACTICES.md**](./BEST-PRACTICES.md) — each
 rule with the incident behind it.
 
-<details><summary><b>Influences</b> — honest credit, and what's different</summary>
+## Influences & differences
 
-**Borrowed:**
-- **OpenClaw** — the tiered memory and the nightly "dreaming" consolidation pass.
-- **Nous Research / Hermes** — the self-hosted, portable, contrarian agent (Leo runs on it).
+Three things people tend to conflate — they sit at **different layers** and
+*compose*, they don't compete:
+
+| | What it is | My relationship to it |
+|---|---|---|
+| **OpenClaw** | A personal-AI **memory architecture** — tiered memory + a nightly "dreaming" consolidation pass. | **Borrowed** the concept. On top I added strict HOT-admission rules + a hard size cap, mechanical **path-scoped** rules, and the git-as-canon hierarchy. |
+| **Hermes** (Nous Research) | An open-weights **model** family, strong at system-prompt adherence. | A **deployment choice**: my contrarian agent (Leo) runs on it — deliberately a *different* model from Claude so it doesn't share Claude's blind spots. Not something I built. |
+| **This eval harness** | A **behavioural eval** for *this* agent's doctrine (safety, memory discipline, tone). | **Mine.** Not a generic LLM-eval framework (promptfoo, DeepEval, Ragas exist and are mature) — it tests my agent's *rules* and gates CI. |
 
 **What I think is actually mine:**
 - **Obsidian-as-shared-memory** — the LLM's memory and my human second brain are the *same files*, not an export.
 - **git-as-canon with a strict hierarchy** — Obsidian = atelier, git = truth, Notion = disposable mirror. One answer when they diverge.
 - **One brain, a staff of runtimes** — terminal, phone, homelab ops; none owns the canon.
-- **Incident-driven guardrails, dated** — not best-practices from a blog, my own mistakes turned into mechanical checks.
-</details>
+- **Incident-driven guardrails, dated** — not blog best-practices, my own mistakes turned into mechanical checks.
+- **An eval with a detect→fix→verify loop** — it caught a real safety gap in my own agent (a ready-to-run prod `DELETE`), which I closed in the doctrine and re-verified.
 
 ## License
 
