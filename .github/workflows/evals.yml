@@ -1,0 +1,29 @@
+name: evals
+
+# Runs the behavioural-doctrine eval harness on every push/PR.
+# Offline mode only: deterministic, stdlib-only, no API key — safe for CI.
+# The runner exits non-zero on any failure or regression, so a red check
+# means a doctrine rule broke. This is what makes "gates CI" real.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  doctrine-evals:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run doctrine eval harness (offline, deterministic)
+        run: python3 tests/doctrine/runner.py
+
+      - name: Publish report
+        if: always()
+        run: cat tests/doctrine/report.md >> "$GITHUB_STEP_SUMMARY"
