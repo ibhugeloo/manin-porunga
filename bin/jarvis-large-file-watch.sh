@@ -22,24 +22,8 @@ if [ ! -f "$PY_SCRIPT" ]; then
     exit 0
 fi
 
-# Lire stdin une fois pour pouvoir l'envoyer à la fois à MOS et au script Python.
+# Lire stdin une fois pour la passer au script Python.
 INPUT=$(cat)
-
-# MOS event (best-effort, fork & forget) — n'affecte pas le hook
-if [ -x "$HOME/.local/bin/jarvis-mos-emit" ]; then
-    TOOL_NAME=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
-    printf '%s' "$INPUT" | "$HOME/.local/bin/jarvis-mos-emit" PostToolUse "$TOOL_NAME" >/dev/null 2>&1 &
-fi
-
-# Auto-sync MOS missions si un fichier share/missions/*.md est touché
-FILE_PATH=$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
-case "$FILE_PATH" in
-    *"/share/missions/"*.md)
-        if [ -x "$HOME/.local/bin/jarvis-mos" ]; then
-            "$HOME/.local/bin/jarvis-mos" sync >/dev/null 2>&1 &
-        fi
-        ;;
-esac
 
 printf '%s' "$INPUT" | /usr/bin/env python3 "$PY_SCRIPT"
 exit $?

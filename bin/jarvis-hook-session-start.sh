@@ -49,11 +49,6 @@ if is_phantom; then
   exit 0
 fi
 
-# MOS event (best-effort, fork & forget) — non-phantom sessions only
-if [[ -x "$HOME/.local/bin/jarvis-mos-emit" ]]; then
-  printf '%s' "$INPUT" | "$HOME/.local/bin/jarvis-mos-emit" SessionStart >/dev/null 2>&1 &
-fi
-
 # --- Logging détaillé pour debug -------------------------------------------
 {
   echo "===================="

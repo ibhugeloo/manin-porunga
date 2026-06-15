@@ -61,11 +61,6 @@ fi
 
 printf '%s' "$INPUT" | "$ENGINE" touch >> "$LOG" 2>&1 || true
 
-# --- MOS event (best-effort, fork & forget via helper) -------------------
-if [[ -x "$HOME/.local/bin/jarvis-mos-emit" ]]; then
-  printf '%s' "$INPUT" | "$HOME/.local/bin/jarvis-mos-emit" UserPromptSubmit >/dev/null 2>&1 &
-fi
-
 # --- Boîte aux lettres : injecter les messages reçus ----------------------
 MSG_BIN="$HOME/.local/bin/jarvis-msg"
 if [[ -x "$MSG_BIN" ]]; then

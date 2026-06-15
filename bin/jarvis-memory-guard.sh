@@ -24,11 +24,6 @@ INPUT=$(cat)
 TOOL_NAME=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty')
 FILE_PATH=$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // empty')
 
-# MOS event (best-effort, silent-fail si daemon down) — fork to not block hook
-if [[ -x "$HOME/.local/bin/jarvis-mos-emit" ]]; then
-  printf '%s' "$INPUT" | "$HOME/.local/bin/jarvis-mos-emit" PreToolUse "$TOOL_NAME" >/dev/null 2>&1 &
-fi
-
 # Filtre : on ne s'occupe que de Write/Edit/MultiEdit
 case "$TOOL_NAME" in
   Write|Edit|MultiEdit) ;;

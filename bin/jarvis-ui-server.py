@@ -487,47 +487,6 @@ def trigger_action(action: str) -> dict:
 
 
 # ----------------------------------------------------------------------------
-# MOS proxy
-# ----------------------------------------------------------------------------
-
-def collect_mos(events_limit: int = 8) -> dict:
-    """Proxy léger vers le daemon MOS (127.0.0.1:3737)."""
-    import urllib.request
-    import urllib.error
-
-    port = os.environ.get("MOS_PORT", "3737")
-    base = f"http://127.0.0.1:{port}"
-    out: dict = {"daemon_up": False, "missions": [], "events": [], "error": None}
-
-    def _get(path: str, timeout: float = 1.5):
-        try:
-            with urllib.request.urlopen(f"{base}{path}", timeout=timeout) as r:
-                return json.loads(r.read().decode("utf-8"))
-        except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError) as e:
-            return {"_error": f"{type(e).__name__}: {e}"}
-
-    health = _get("/health")
-    if "_error" in health:
-        out["error"] = health["_error"]
-        return out
-    out["daemon_up"] = bool(health.get("ok"))
-    out["counts"] = {"missions": health.get("missions", 0), "events": health.get("events", 0)}
-
-    missions_resp = _get("/missions")
-    if "_error" not in missions_resp:
-        all_missions = missions_resp.get("missions", []) or []
-        order = {"wip": 0, "blocked": 1, "open": 2, "done": 3, "dropped": 4}
-        all_missions.sort(key=lambda m: (order.get(m.get("status", "open"), 9), m.get("id", "")))
-        out["missions"] = all_missions
-
-    events_resp = _get(f"/events/recent?limit={events_limit}")
-    if "_error" not in events_resp:
-        out["events"] = events_resp.get("events", []) or []
-
-    return out
-
-
-# ----------------------------------------------------------------------------
 # Memory
 # ----------------------------------------------------------------------------
 
@@ -1088,8 +1047,6 @@ class Handler(BaseHTTPRequestHandler):
                 return
             elif path == "/api/repos":
                 self._json(collect_repos())
-            elif path == "/api/mos":
-                self._json(collect_mos())
             elif path == "/api/debug/cfg":
                 load_repos_config()
                 _watchtower_load_projects()

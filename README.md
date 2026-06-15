@@ -161,7 +161,6 @@ claude-config/ ← Claude Code hooks + slash commands + path-scoped rules + the 
 docs/          ← how each subsystem works (one doc per subsystem)
 config/        ← per-project config (watchtower, finance…) — *.example.yaml here
 LaunchAgents/  ← macOS launchd templates for the scheduled routines (opt-in)
-mos/           ← Mission OS: bounded tasks with state (FastAPI + SQLite)
 tests/         ← doctrine scenarios — the persona's rules are tested, not just written
 ```
 
@@ -248,7 +247,6 @@ Nothing exotic — the point is the *architecture*, not the dependencies.
 **Engine**
 - ~30 **zsh/bash** scripts (dispatcher, routines, hooks, guards, UI server) +
   **Python 3** for the heavier bits
-- **FastAPI + Pydantic + SQLite** — Mission OS, bounded tasks with state
 - **Claude Code hooks + slash commands + path-scoped rules**, wired by
   `bootstrap.sh`
 - macOS **launchd** templates — opt-in, every model-calling cron off by default

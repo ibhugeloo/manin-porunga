@@ -12,7 +12,7 @@ le boss a trois assistants IA distincts, chacun avec un périmètre net. Ce docu
 
 | Nom | Modèle | Périmètre | Invocation | Source du prompt | Auth |
 |---|---|---|---|---|---|
-| **Jarvis** | Claude Opus 4.7 | Majordome principal — vault, finance, dev, watchtower, routines, MOS, mémoire transverse | Session Claude Code interactive ou `jarvis <cmd>` (dispatcher) | `~/.claude/CLAUDE.md` + imports `Obsidian/vault/Claude/Memory/*` | Abo Claude Max (OAuth) |
+| **Jarvis** | Claude Opus 4.7 | Majordome principal — vault, finance, dev, watchtower, routines, mémoire transverse | Session Claude Code interactive ou `jarvis <cmd>` (dispatcher) | `~/.claude/CLAUDE.md` + imports `Obsidian/vault/Claude/Memory/*` | Abo Claude Max (OAuth) |
 | **Alfred** | Claude Opus 4.7 | Sysadmin senior — Proxmox, VLANs, Coolify homelab, LXC/VM, backup 3-2-1 | `alfred "<question>"` (one-shot non-interactif) | `Obsidian/vault/Homelab/alfred_project_instructions.md` (chargé via `--system-prompt`) | Abo Claude Max (OAuth) |
 | **Leo** | OpenAI GPT-5.5 (via **Hermes Agent**, self-hosted LXC <your-lxc-id> · `<llm-lxc-ip>`) | **Contradicteur + majordome de secours — pair de Jarvis.** Second avis (archi, code critique, stratégie) **et** capable de reprendre la barre si Jarvis tombe | `leo "<question>"` (wrapper SSH → `hermes -z` dans le LXC) | `/root/.hermes/SOUL.md` (côté Hermes, dans le LXC) | Abo ChatGPT (provider `openai-codex`) |
 

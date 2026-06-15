@@ -1,6 +1,6 @@
 ---
 name: Memory backup automatique vers GitHub privé
-description: Cron quotidien 23h30 qui synchronise Memory + Sessions + Projects + vault élargi + snapshot MOS du vault vers le repo Git privé `<your-user>/<your-jarvis>`. Disaster recovery, portabilité cross-Mac, ET alimentation du canon read-only lu par Leo.
+description: Cron quotidien 23h30 qui synchronise Memory + Sessions + Projects + vault élargi vers le repo Git privé `<your-user>/<your-jarvis>`. Disaster recovery, portabilité cross-Mac, ET alimentation du canon read-only lu par Leo.
 type: reference
 ---
 
@@ -28,7 +28,6 @@ La mémoire transverse Jarvis (`Memory/*.md`, `Sessions/*.md`, `Projects/*.md`) 
 ~/Documents/Obsidian/vault/Claude/Projects/    ──→ obsidian-projects/
 ~/Documents/Obsidian/vault/{Holding,Brief,ClientA,Agency,
    AgencyApp,ShopApp,Personnes,Ressources,Watchtower}/ ──→ obsidian-vault/<dir>/
-~/.local/share/jarvis/mos.db                    ──→ state/mos.db (snapshot sqlite .backup)
                                                   │  (rsync -a --delete, exclusions secrets)
                                                   ↓
                   ~/Documents/GIT PROD/manin-control-room/

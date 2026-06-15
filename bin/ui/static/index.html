@@ -285,7 +285,6 @@ header {
 #brief-content    { max-height: 520px; overflow-y: auto; padding-right: 6px; }
 #activity-feed    { max-height: 520px; overflow-y: auto; padding-right: 6px; }
 #bot-content      { max-height: 640px; overflow-y: auto; padding-right: 6px; }
-#mos-content      { max-height: 360px; overflow-y: auto; padding-right: 6px; }
 #capture-content  { max-height: 240px; overflow-y: auto; padding-right: 6px; }
 #watchtower-content { max-height: 280px; overflow-y: auto; padding-right: 6px; }
 
@@ -312,25 +311,6 @@ header {
 .card-logs         { grid-column: span 12; }
 .card-domains      { grid-column: span 12; }
 .card-watchtower   { grid-column: span 12; }
-.card-mos          { grid-column: span 12; }
-.mos-grid          { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-@media (max-width: 900px) { .mos-grid { grid-template-columns: 1fr; } }
-.mos-section       { display: flex; flex-direction: column; gap: 8px; }
-.mos-section h4    { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.6; margin: 0 0 4px; }
-.mos-mission       { display: flex; align-items: baseline; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border, rgba(255,255,255,0.06)); }
-.mos-mission:last-child { border-bottom: 0; }
-.mos-mission-id    { font-family: var(--font-mono, ui-monospace, monospace); font-size: 11px; opacity: 0.7; min-width: 70px; }
-.mos-mission-title { flex: 1; font-size: 13px; }
-.mos-status        { font-size: 10px; padding: 2px 8px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.05em; }
-.mos-status-wip    { background: rgba(255, 165, 0, 0.18); color: #ffa500; }
-.mos-status-blocked{ background: rgba(255, 80, 80, 0.18); color: #ff5050; }
-.mos-status-open   { background: rgba(120, 180, 255, 0.18); color: #78b4ff; }
-.mos-status-done   { background: rgba(120, 200, 120, 0.15); color: #78c878; opacity: 0.65; }
-.mos-status-dropped{ background: rgba(180, 180, 180, 0.12); color: #aaa; opacity: 0.5; }
-.mos-event         { display: grid; grid-template-columns: 80px 1fr auto; gap: 8px; padding: 4px 0; font-size: 11px; opacity: 0.85; font-family: var(--font-mono, ui-monospace, monospace); }
-.mos-event-time    { opacity: 0.55; }
-.mos-event-tool    { opacity: 0.7; font-size: 10px; }
-.mos-down          { padding: 16px; opacity: 0.7; font-style: italic; }
 
 /* Watchtower — santé prod des projets clients */
 .wt-grid {
@@ -1744,9 +1724,9 @@ a:hover { border-bottom-color: var(--ink); }
     </section>
 
     <!-- ============================================================== -->
-    <!-- ZONE 3 — SURVEILLANCE · prod, missions, infra, agents, bot     -->
+    <!-- ZONE 3 — SURVEILLANCE · prod, infra, agents, bot               -->
     <!-- ============================================================== -->
-    <h2 id="surveillance" class="zone-title"><span>Surveillance</span><span class="zone-hint">Prod clients · missions · domaines · agents · bot</span></h2>
+    <h2 id="surveillance" class="zone-title"><span>Surveillance</span><span class="zone-hint">Prod clients · domaines · agents · bot</span></h2>
 
     <section class="card card-watchtower" style="animation-delay: 150ms">
       <div class="card-label">
@@ -1754,14 +1734,6 @@ a:hover { border-bottom-color: var(--ink); }
         <span id="watchtower-counter" class="tag"></span>
       </div>
       <div id="watchtower-content"></div>
-    </section>
-
-    <section class="card card-mos" style="animation-delay: 155ms">
-      <div class="card-label">
-        <span>Missions &amp; events</span>
-        <span id="mos-counter" class="tag"></span>
-      </div>
-      <div id="mos-content"></div>
     </section>
 
     <section class="card card-domains" style="animation-delay: 160ms">
@@ -2793,80 +2765,6 @@ async function fetchAndRenderDomains() {
 }
 
 // ─── Watchtower ──────────────────────────────────────────────────────────────
-function renderMOS(mos) {
-  const c = $('#mos-content');
-  const counter = $('#mos-counter');
-  if (!c) return;
-
-  if (!mos || !mos.daemon_up) {
-    if (counter) {
-      counter.innerHTML = `<span class="dot error"></span><span>daemon down</span>`;
-    }
-    const errMsg = (mos && mos.error) ? `: ${escape(String(mos.error))}` : '';
-    c.innerHTML = `<div class="mos-down">MOS daemon injoignable sur 127.0.0.1:3737${errMsg}<br/>` +
-      `<code style="font-family:var(--mono);opacity:0.6">launchctl load ~/Library/LaunchAgents/com.example.jarvis.mos.plist</code></div>`;
-    return;
-  }
-
-  const missions = mos.missions || [];
-  const events = mos.events || [];
-  const active = missions.filter(m => ['wip','blocked','open'].includes(m.status));
-
-  if (counter) {
-    const wipCount = missions.filter(m => m.status === 'wip').length;
-    const blockedCount = missions.filter(m => m.status === 'blocked').length;
-    const dotCls = blockedCount > 0 ? 'warn' : '';
-    const label = `${active.length} active${active.length > 1 ? 's' : ''}` +
-      (wipCount ? ` · ${wipCount} wip` : '') +
-      (blockedCount ? ` · ${blockedCount} bloquée${blockedCount > 1 ? 's' : ''}` : '');
-    counter.innerHTML = `<span class="dot ${dotCls}"></span><span>${escape(label)}</span>`;
-  }
-
-  // Missions section
-  let missionsHtml;
-  if (!active.length) {
-    missionsHtml = `<p style="opacity:0.6;font-style:italic;margin:8px 0">Aucune mission active. Ouvrez-en avec <code>jarvis-mos open &lt;slug&gt;</code>.</p>`;
-  } else {
-    missionsHtml = active.slice(0, 8).map(m => {
-      const statusCls = `mos-status mos-status-${escape(m.status)}`;
-      return `<div class="mos-mission">
-        <span class="mos-mission-id">${escape(m.id)}</span>
-        <span class="mos-mission-title">${escape(m.title || '')}</span>
-        <span class="${statusCls}">${escape(m.status)}</span>
-      </div>`;
-    }).join('');
-  }
-
-  // Events section
-  let eventsHtml;
-  if (!events.length) {
-    eventsHtml = `<p style="opacity:0.6;font-style:italic;margin:8px 0">Aucun event reçu. Les hooks vont commencer à alimenter MOS.</p>`;
-  } else {
-    eventsHtml = events.slice(0, 8).map(ev => {
-      const t = ev.ts ? ev.ts.slice(11, 19) : '';
-      const tool = ev.tool ? `<span class="mos-event-tool">${escape(ev.tool)}</span>` : '<span class="mos-event-tool">—</span>';
-      return `<div class="mos-event">
-        <span class="mos-event-time">${escape(t)}</span>
-        <span>${escape(ev.hook || '?')}</span>
-        ${tool}
-      </div>`;
-    }).join('');
-  }
-
-  c.innerHTML = `
-    <div class="mos-grid">
-      <div class="mos-section">
-        <h4>Missions actives</h4>
-        ${missionsHtml}
-      </div>
-      <div class="mos-section">
-        <h4>Events récents (${events.length})</h4>
-        ${eventsHtml}
-      </div>
-    </div>`;
-}
-
-
 function renderWatchtower(wt) {
   const c = $('#watchtower-content');
   const counter = $('#watchtower-counter');
@@ -3034,13 +2932,12 @@ async function refresh() {
       fetch('/api/domains').then(r => r.json()),
       fetch('/api/watchtower').then(r => r.json()),
       fetch('/api/subagents').then(r => r.json()).catch(() => ({ agents: [], running_count: 0, total: 0 })),
-      fetch('/api/mos').then(r => r.json()).catch(() => ({ daemon_up: false, missions: [], events: [], error: 'fetch failed' })),
       fetch('/api/telemetry').then(r => r.json()).catch(() => null),
     ];
     if (!actionsLoaded) promises.push(fetch('/api/actions').then(r => r.json()));
 
     const results = await Promise.all(promises);
-    const [repos, agents, briefs, sessions, telegram, logs, domains, watchtower, subagents, mos, telemetry, actions] = results;
+    const [repos, agents, briefs, sessions, telegram, logs, domains, watchtower, subagents, telemetry, actions] = results;
     renderTelemetry(telemetry);
     renderSubagentsSummary(subagents);
     briefData = briefs;
@@ -3053,7 +2950,6 @@ async function refresh() {
     renderLogs(logs);
     renderDomains(domains);
     renderWatchtower(watchtower);
-    renderMOS(mos);
     if (actions) {
       renderActions(actions);
       actionsLoaded = true;

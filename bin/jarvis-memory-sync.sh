@@ -86,19 +86,6 @@ done
 # Index racine du vault (carte HOT auto-régénérée) — fichier à la racine, hors VAULT_DIRS.
 [[ -f "$VAULT_BASE/_vault-index.md" ]] && cp "$VAULT_BASE/_vault-index.md" "$REPO/obsidian-vault/_vault-index.md"
 
-# MOS database snapshot (state non-source-of-truth — reconstructible mais utile pour
-# audits cross-machine et protection contre une corruption locale).
-# Snapshot SQLite via .backup pour cohérence WAL ; rsync direct = OK mais peut chopper
-# un état partiel si l'API est en train d'écrire.
-MOS_DB="$HOME/.local/share/jarvis/mos.db"
-if [[ -f "$MOS_DB" ]]; then
-  if command -v sqlite3 >/dev/null 2>&1; then
-    sqlite3 "$MOS_DB" ".backup '$REPO/state/mos.db'" 2>>"$LOG" || true
-  else
-    cp "$MOS_DB" "$REPO/state/mos.db" 2>>"$LOG" || true
-  fi
-fi
-
 cd "$REPO" || { echo "[$(date)] cd failed" >> "$LOG"; exit 1; }
 
 # Y a-t-il des changements ?

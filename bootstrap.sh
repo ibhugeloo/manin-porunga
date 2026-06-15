@@ -310,7 +310,7 @@ for src in "$JARVIS_SRC/bin/"*; do
   fi
 done
 
-# UI static assets (pages HTML extraites de jarvis-ui-server.py — Phase 2 MOS-004 2026-05-09)
+# UI static assets (pages HTML extraites de jarvis-ui-server.py)
 # Le serveur les charge via Path(__file__).parent / "ui" / "static" — on miroir
 # bin/ui/ vers ~/.local/bin/ui/ (TCC-safe).
 if [[ -d "$JARVIS_SRC/bin/ui" ]]; then
@@ -335,37 +335,6 @@ for src in "$JARVIS_SRC/share/"*; do
     cp "$src" "$dst" && ok "Copie : $dst"
   fi
 done
-
-step "Python package mos/ (Mission Operating System)"
-# mos/ doit être hors de ~/Documents/ pour être lisible par launchd (TCC).
-MOS_SRC_DIR="$JARVIS_SRC/mos"
-MOS_LIB_DIR="$LOCAL_SHARE/lib"
-MOS_DST_DIR="$MOS_LIB_DIR/mos"
-if [[ -d "$MOS_SRC_DIR" ]]; then
-  mkdir -p "$MOS_LIB_DIR"
-  if [[ -d "$MOS_DST_DIR" ]]; then
-    rm -rf "$MOS_DST_DIR"
-  fi
-  cp -R "$MOS_SRC_DIR" "$MOS_DST_DIR"
-  # Ne jamais copier __pycache__
-  find "$MOS_DST_DIR" -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
-  ok "mos/ déployé : $MOS_DST_DIR"
-
-  # Vérifier les paquets Python requis dans le venv
-  VENV_PY="$LOCAL_SHARE/venv/bin/python"
-  if [[ -x "$VENV_PY" ]]; then
-    if "$VENV_PY" -c "import fastapi, uvicorn, sqlite_vec" >/dev/null 2>&1; then
-      ok "venv : fastapi + uvicorn + sqlite_vec OK"
-    else
-      warn "venv : paquets manquants — exécuter :"
-      info "  $LOCAL_SHARE/venv/bin/pip install fastapi 'uvicorn[standard]' sqlite-vec sentence-transformers PyYAML"
-    fi
-  else
-    warn "venv introuvable : $LOCAL_SHARE/venv (créer avec python -m venv puis installer fastapi uvicorn sqlite-vec sentence-transformers PyYAML)"
-  fi
-else
-  info "Pas de mos/ source — skip"
-fi
 
 step "LaunchAgents (cron jobs)"
 for tpl in "$JARVIS_SRC/LaunchAgents/"*.plist.template; do

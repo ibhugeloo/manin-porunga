@@ -29,11 +29,6 @@ SESSION_ID=$(printf '%s' "$INPUT" | jq -r '.session_id // empty')
 CWD=$(printf '%s' "$INPUT" | jq -r '.cwd // empty')
 REASON=$(printf '%s' "$INPUT" | jq -r '.reason // empty')
 
-# MOS event (best-effort, fork & forget) — log la fin de session avec sa raison
-if [[ -x "$HOME/.local/bin/jarvis-mos-emit" ]]; then
-  printf '%s' "$INPUT" | "$HOME/.local/bin/jarvis-mos-emit" SessionEnd >/dev/null 2>&1 &
-fi
-
 DATE=$(date +%Y-%m-%d)
 TIMESTAMP=$(date +%H%M)
 SHORT_ID=$(printf '%s' "$SESSION_ID" | head -c 8)
@@ -397,7 +392,7 @@ WORKER_OUTPUT_FILE="$OUTPUT_FILE"
 echo "[$(date)] Recap written: $OUTPUT_FILE ($(wc -l < "$OUTPUT_FILE") lignes)" >> "$LOG"
 
 # ---------------------------------------------------------------------------
-# MOS-002 — auto-critique sur les sessions touchant un projet client.
+# Auto-critique §5 — auto-critique sur les sessions touchant un projet client.
 # Corrections 2026-05-28 (suite eval 2026-05-26 — 80 % de bruit) :
 #  - Nom de projet extrait du CWD (plus de hardcode example-app).
 #  - Whitelist explicite des projets clients facturables.
@@ -406,16 +401,16 @@ echo "[$(date)] Recap written: $OUTPUT_FILE ($(wc -l < "$OUTPUT_FILE") lignes)" 
 #  - Filtre code-only : exige ≥ 1 tool call Edit/Write/MultiEdit. Les sessions
 #    de discussion (tarification, README, comparaison pricing) ne sont plus
 #    flaguées (avant : faux positifs systématiques).
-#  - Sortie dans log dédié (~/.local/var/log/mos-002.log), PLUS dans
+#  - Sortie dans log dédié (~/.local/var/log/autocritique.log), PLUS dans
 #    observations.md (la règle vit déjà en HOT dans SOUL §5, l'observation
 #    n'est jamais promouvable et noie les vrais patterns).
 # ---------------------------------------------------------------------------
-MOS002_LOG="$HOME/.local/var/log/mos-002.log"
-MOS002_SEEN="$HOME/.local/var/jarvis-mos-002-seen.txt"
-STREAK_FILE="$HOME/.local/var/jarvis-mos-002-streak.txt"
-mkdir -p "$(dirname "$MOS002_LOG")"
+AUTOCRIT_LOG="$HOME/.local/var/log/autocritique.log"
+AUTOCRIT_SEEN="$HOME/.local/var/jarvis-autocritique-seen.txt"
+STREAK_FILE="$HOME/.local/var/jarvis-autocritique-streak.txt"
+mkdir -p "$(dirname "$AUTOCRIT_LOG")"
 mkdir -p "$(dirname "$STREAK_FILE")"
-touch "$MOS002_SEEN"
+touch "$AUTOCRIT_SEEN"
 
 # Extraction du nom de projet à partir du CWD uniquement (jamais via transcript
 # grep qui produit des faux positifs). Gère la réorg sous-workspaces du
@@ -439,29 +434,29 @@ if [[ "$CWD" == *"/GIT PROD/"* ]]; then
 fi
 
 if [[ -n "$SCOPE_CLIENT" ]]; then
-  # Dédup : skip si cette session_id a déjà été évaluée par MOS-002.
-  if [[ -n "$SESSION_ID" ]] && grep -qF "$SESSION_ID" "$MOS002_SEEN" 2>/dev/null; then
-    echo "[$(date)] MOS-002 skip — session $SHORT_ID déjà évaluée sur $SCOPE_CLIENT" >> "$LOG"
+  # Dédup : skip si cette session_id a déjà été évaluée par Auto-critique §5.
+  if [[ -n "$SESSION_ID" ]] && grep -qF "$SESSION_ID" "$AUTOCRIT_SEEN" 2>/dev/null; then
+    echo "[$(date)] Auto-critique Â§5 skip — session $SHORT_ID déjà évaluée sur $SCOPE_CLIENT" >> "$LOG"
   # Filtre code-only : la session doit avoir produit ≥ 1 tool call de modif.
   elif ! grep -qE '"name":"(Edit|Write|MultiEdit|NotebookEdit)"' "$TRANSCRIPT_PATH" 2>/dev/null; then
-    echo "[$(date)] MOS-002 skip — session $SHORT_ID sans modif code sur $SCOPE_CLIENT (discussion/lecture)" >> "$LOG"
-    [[ -n "$SESSION_ID" ]] && echo "$SESSION_ID" >> "$MOS002_SEEN"
+    echo "[$(date)] Auto-critique Â§5 skip — session $SHORT_ID sans modif code sur $SCOPE_CLIENT (discussion/lecture)" >> "$LOG"
+    [[ -n "$SESSION_ID" ]] && echo "$SESSION_ID" >> "$AUTOCRIT_SEEN"
   else
-    MOS002_RESULT="miss"
+    AUTOCRIT_RESULT="miss"
     if grep -qiE 'auto[- ]critique|qu.?est.?ce qui peut casser' "$OUTPUT_FILE"; then
-      MOS002_RESULT="ok"
+      AUTOCRIT_RESULT="ok"
       PREV=$(cat "$STREAK_FILE" 2>/dev/null || echo 0)
       NEW=$((PREV + 1))
       echo "$NEW" > "$STREAK_FILE"
-      echo "[$(date)] MOS-002 OK — $SCOPE_CLIENT session=$SHORT_ID streak=$NEW" >> "$MOS002_LOG"
+      echo "[$(date)] Auto-critique Â§5 OK — $SCOPE_CLIENT session=$SHORT_ID streak=$NEW" >> "$AUTOCRIT_LOG"
       if [[ "$NEW" -ge 3 ]] && [[ "$PREV" -lt 3 ]]; then
-        echo "[$(date)] MOS-002 STREAK 3 — mission candidate close" >> "$MOS002_LOG"
+        echo "[$(date)] Auto-critique — 3 sessions client d'affilée avec auto-critique" >> "$AUTOCRIT_LOG"
         [[ -x "$HOME/.local/bin/jarvis-notify" ]] && \
-          "$HOME/.local/bin/jarvis-notify" "✅ MOS-002 — streak 3 atteint, mission candidate close" 2>/dev/null || true
+          "$HOME/.local/bin/jarvis-notify" "✅ Auto-critique — 3 sessions client d'affilée OK" 2>/dev/null || true
       fi
     else
       echo "0" > "$STREAK_FILE"
-      echo "[$(date)] MOS-002 MISS — $SCOPE_CLIENT session=$SHORT_ID cwd=$CWD (streak reset)" >> "$MOS002_LOG"
+      echo "[$(date)] Auto-critique Â§5 MISS — $SCOPE_CLIENT session=$SHORT_ID cwd=$CWD (streak reset)" >> "$AUTOCRIT_LOG"
 
       # Nudge en queue du récap (repris par le push Notion). Plus d'écriture
       # dans observations.md — la règle vit dans SOUL §5, l'observation y
@@ -470,7 +465,7 @@ if [[ -n "$SCOPE_CLIENT" ]]; then
         echo ""
         echo "---"
         echo ""
-        echo "## ⚠️ MOS-002 — Auto-critique manquante"
+        echo "## ⚠️ Auto-critique manquante (SOUL §5)"
         echo ""
         echo "Cette session a touché le projet client **$SCOPE_CLIENT** mais le récap n'inclut pas de section auto-critique (SOUL §5)."
         echo ""
@@ -479,20 +474,15 @@ if [[ -n "$SCOPE_CLIENT" ]]; then
         echo "- Ce qui est fixé maintenant avant que vous testiez"
         echo "- Ce qui demande de la vigilance opérationnelle au déploiement"
         echo ""
-        echo "_Streak MOS-002 reseté à 0._"
+        echo "_Streak Auto-critique §5 reseté à 0._"
       } >> "$OUTPUT_FILE"
 
       # Push Telegram pour visibilité immédiate.
       [[ -x "$HOME/.local/bin/jarvis-msg" ]] && \
-        "$HOME/.local/bin/jarvis-msg" "🟡 MOS-002 — session $SCOPE_CLIENT sans auto-critique (streak reset)" 2>/dev/null || true
+        "$HOME/.local/bin/jarvis-msg" "🟡 Auto-critique §5 — session $SCOPE_CLIENT sans auto-critique (streak reset)" 2>/dev/null || true
     fi
 
-    [[ -n "$SESSION_ID" ]] && echo "$SESSION_ID" >> "$MOS002_SEEN"
-
-    # Emit MOS event pour traçabilité dans le widget.
-    if [[ -x "$HOME/.local/bin/jarvis-mos-emit" ]]; then
-      printf '%s' "$INPUT" | "$HOME/.local/bin/jarvis-mos-emit" "MOS002_${MOS002_RESULT:-unknown}" "$SCOPE_CLIENT" >/dev/null 2>&1 &
-    fi
+    [[ -n "$SESSION_ID" ]] && echo "$SESSION_ID" >> "$AUTOCRIT_SEEN"
   fi
 fi
 
