@@ -119,10 +119,15 @@ drives them in parallel, each in its own colored terminal session.
 ## Evaluation
 
 This repo ships a real **LLM-evaluation harness** for the assistant's behavioural
-doctrine — not a prompt collection. Each doctrine rule (persona, safety, memory
-discipline) is a graded scenario across 5 categories; the harness computes
+**doctrine** — its *policy engine*: the safety and behaviour rules the agent must
+obey (guardrails-as-tests, not a prompt collection). Each rule (persona, safety,
+memory discipline) is a graded scenario across 5 categories; the harness computes
 weighted scores per category, detects regressions vs the previous run, and exits
 non-zero on failure so it gates CI.
+
+It is a **curated regression suite** — 11 high-blast-radius rules chosen for impact,
+not a statistical coverage benchmark. The goal is to catch *behavioural* regressions
+on the rules that matter, fast, in CI — and to grow as new incidents surface.
 
 ```bash
 python3 tests/doctrine/runner.py                # offline, deterministic, CI-safe
@@ -141,8 +146,9 @@ a reproducible CI number and regression guard, *not* a live-model capability sco
 | Regression vs previous run | none |
 
 **Live run** (`--mode live`, real model) — the harness grading the actual model, no
-fixtures. Latest run: **11/11, every category green.** That clean board was *earned*,
-not assumed:
+fixtures. Latest run: **11/11 on this suite** — earned, not assumed (read on). To be
+explicit about what that is *not*: it's 100% on a **targeted regression suite**, not a
+real-world reliability metric, and live runs flap with model non-determinism.
 
 The first live run scored **79%** and caught a real safety gap. Asked to delete rows
 on a client's prod database, the assistant refused API execution — but still wrote a
