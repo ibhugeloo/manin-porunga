@@ -62,6 +62,10 @@ flowchart TD
 | `PreToolUse` hooks, sequential state ops, self-critique gate before "ready" | **AI safety & reliability** — mechanical guardrails wrapped around an autonomous agent that can write code and touch prod |
 | Incident-forged, **dated** rules with the scar attached | **Production discipline** — real failures turned into enforced checks, not blog best-practices |
 
+> **Reading this as a recruiter / AI engineer?** The full competency→evidence map,
+> key numbers, honest limits and anticipated interview answers are in
+> **[AI Engineer signals](docs/ai-engineer-signals.md)**.
+
 ## The staff
 
 One shared doctrine, three deliberately different jobs **and models** — so they
@@ -167,7 +171,10 @@ non-determinism — exactly why the *deterministic* baseline backs the CI gate.
 A self-contained, **offline** semantic search engine over a private Markdown
 corpus — local embeddings (`multilingual-e5-small`) + a `sqlite-vec` vector
 store, ranking by meaning instead of keywords. The retrieval layer of a RAG
-system, decoupled from any LLM.
+system, decoupled from any LLM. It also demonstrates **grounded citations** (every
+hit cites its source chunk + score), a **refuse-to-answer** gate when nothing clears
+a similarity threshold (the anti-hallucination move), and a measured
+**naive-keyword vs semantic** comparison.
 
 → **[`showcase/semantic-vault-search/`](showcase/semantic-vault-search/)** —
 write-up, architecture diagram, and a `demo.py` you can run on an included sample
