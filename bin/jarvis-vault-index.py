@@ -5,7 +5,7 @@ jarvis-vault-index — Indexe le vault Obsidian + sessions Jarvis dans une DB sq
 Sources scannées :
 - ~/Documents/Obsidian/vault/                 (vault Obsidian complet, hors .obsidian)
 - ~/Documents/Obsidian/vault/Claude/Sessions/ (récaps de sessions Jarvis)
-- ~/Documents/GIT PROD/manin-control-room/   (lessons.md, notes synthèse)
+- ~/Documents/GIT PROD/manin-porunga/   (lessons.md, notes synthèse)
 
 Output : ~/.local/share/jarvis/vault.db (sqlite-vec, ~10-50 MB selon volume)
 
@@ -34,7 +34,7 @@ from pathlib import Path
 
 HOME = Path.home()
 VAULT = HOME / "Documents" / "Obsidian" / "vault"
-JARVIS_REPO = HOME / "Documents" / "GIT PROD" / "manin-control-room"
+JARVIS_REPO = HOME / "Documents" / "GIT PROD" / "manin-porunga"
 DB_PATH = HOME / ".local" / "share" / "jarvis" / "vault.db"
 LOG_PATH = HOME / ".local" / "var" / "log" / "jarvis-vault-index.log"
 

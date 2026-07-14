@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Jarvis">
-  <text x="50%" y="80%" text-anchor="middle"
-        font-family="'Instrument Serif', 'Lyon Text', Georgia, serif"
-        font-size="36" font-style="italic" font-weight="400"
-        fill="currentColor">J</text>
-  <circle cx="19" cy="5" r="3" fill="#EC6A31"/>
-</svg>

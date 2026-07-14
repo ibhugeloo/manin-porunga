@@ -388,10 +388,9 @@ instead of the private vault) and the **DB location** (in-memory instead of
 `~/.local/share/jarvis/vault.db`) — so it's runnable by anyone, while exercising
 the production logic rather than a reimplementation.
 
-Production reference docs:
-[`docs/vault-search-v2.md`](../../docs/vault-search-v2.md) (engine) and
-[`docs/vault-search-v1.md`](../../docs/vault-search-v1.md) (the keyword
-predecessor it replaced).
+Production source:
+[`bin/vault-search-v2.py`](../../bin/vault-search-v2.py) (search engine) and
+[`bin/jarvis-vault-index.py`](../../bin/jarvis-vault-index.py) (indexer).
 
 ---
 

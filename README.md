@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="docs/assets/logo-manin.png" width="140" alt="Manin Control Room" />
+  <img src="docs/assets/logo-manin.png" width="140" alt="Manin Porunga" />
 </p>
 
-<h1 align="center">Manin Control Room</h1>
+<h1 align="center">Manin Porunga</h1>
 
 <p align="center">
-  <a href="https://github.com/ibhugeloo/manin-control-room/actions/workflows/evals.yml"><img src="https://github.com/ibhugeloo/manin-control-room/actions/workflows/evals.yml/badge.svg" alt="doctrine evals" /></a>
+  <a href="https://github.com/ibhugeloo/manin-porunga/actions/workflows/evals.yml"><img src="https://github.com/ibhugeloo/manin-porunga/actions/workflows/evals.yml/badge.svg" alt="doctrine evals" /></a>
 </p>
 
 <p align="center">
@@ -14,12 +14,14 @@
 </p>
 
 <p align="center">
-  <sub>Sanitized template — the structure of an assistant I drive every day, personal content
-  stripped and replaced by fill-in-the-blank files. Fork it, make it yours.</sub>
+  <sub>Curated public mirror of a private system I build and run daily. Kept deliberately
+  small — only the pieces worth reading: the <a href="#evaluation">CI-gated eval harness</a>,
+  the <a href="#showcase-semantic-vault-search-local-rag">offline RAG engine</a>, the
+  doctrine, and the guardrails.</sub>
 </p>
 
 <p align="center">
-  <sub>Built and run daily — also a worked example of context engineering, retrieval,
+  <sub>A worked example of context engineering, retrieval,
   multi-agent orchestration and LLM evals.
   See <a href="#what-this-demonstrates-engineering">what this demonstrates</a>.</sub>
 </p>
@@ -80,9 +82,6 @@ don't share blind spots. Jarvis and Leo debate; **I decide**.
 | **Jarvis** | terminal (macOS) | **Builder** — writes code, runs routines, edits the vault. Commits locally; never pushes/deploys without a yes. | Claude Code |
 | **Leo** | phone (Telegram) | **Contrarian** — reads the canon read-only, answers with verdicts (*validated / with-reservations / not-validated*), not flattery. | self-hosted [Hermes](https://nousresearch.com) |
 | **Alfred** | homelab (Proxmox) | **Sysadmin** — ops only, narrow blast radius. | scoped model |
-
-A separate cockpit — [`thousand-sunny`](https://github.com/ibhugeloo/thousand-sunny) —
-drives them in parallel, each in its own colored terminal session.
 
 ## Features
 
@@ -215,115 +214,34 @@ rule, actionable, with its incident.
 - **Night** — self-eval samples sessions and lessons, proposes doctrine
   promotions. Persona changes wait for my explicit yes.
 
-## Command reference
-
-**Dispatcher** — `jarvis <verb>`, strictly manual:
-
-| Command | What it does |
-|---------|-------------|
-| `jarvis jour` | Morning brief — calendar, mail, repo git state, vault to-dos, client activity |
-| `jarvis hebdo` · `mensuel` | Weekly review · monthly retrospective |
-| `jarvis veille` | Daily watch pass |
-| `jarvis evaluation` | Self-review — detect patterns, propose doctrine promotions |
-| `jarvis watchtower` | Prod health of client projects (Sentry / Vercel / Supabase) |
-| `jarvis finance` | Earnings analysis of the tracked portfolio |
-| `jarvis tech-watch` | External agentic / Claude Code watch |
-| `jarvis notion-sync` | Pull Notion → vault (≈ monthly) |
-| `jarvis memory-sync` | Mirror the memory vault to private git |
-| `jarvis sessions-purge` | Archive to Notion + purge session recaps > 90 days |
-
-**Slash commands** — inside a Claude Code session:
-
-| Command | What it does |
-|---------|-------------|
-| `/jarvis-ship` | Gated delivery pipeline — Research → Plan → Execute → Review → Ship |
-| `/jarvis-jour` · `/jarvis-watchtower` · `/jarvis-finance` · `/jarvis-tech-watch` · `/jarvis-audit` | Run the matching routine in-session |
-| `/observe` | Capture a user-model observation into the doctrine |
-| `/save` | Snapshot the current session into the vault |
-
 ## What's in the box
 
 ```
-memory/        ← the doctrine (persona, profile, decisions, dreams, workflows) — HOT files
-share/         ← prompts for each routine (brief, weekly, eval, watchtower, finance…) + missions
-bin/           ← the engine: dispatcher, semantic vault search, routines, hooks, guards, UI server
-claude-config/ ← Claude Code hooks + slash commands + path-scoped rules + the @import list
-docs/          ← how each subsystem works (one doc per subsystem)
-config/        ← per-project config (watchtower, finance…) — *.example.yaml here
-LaunchAgents/  ← macOS launchd templates for the scheduled routines (opt-in)
-tests/         ← doctrine scenarios — the persona's rules are tested, not just written
+tests/doctrine/ ← the eval harness: 11 graded scenarios, weighted scoring, regression gate (CI)
+showcase/       ← local RAG demo — runs on an included sample corpus, imports the real engine
+bin/            ← the pieces worth reading: semantic search engine + indexer, 3 guardrail hooks
+memory/         ← the doctrine, sanitized (persona, profile, decisions, workflows) — HOT files
+claude-config/  ← path-scoped rules + the @import list (the tiered-memory wiring)
+docs/           ← the recruiter-first map: ai-engineer-signals.md
 ```
 
-## Install
+The full engine (dispatcher, routines, dashboard, Telegram bot, launchd
+templates, bootstrap) lives in the private repo this mirrors — what's kept here
+is the part that shows the engineering, not the plumbing.
 
-**Requirements**
+## Try it
 
-- macOS (launchd, `~/.local/bin`, shell hooks — Linux works with minor tweaks,
-  Windows needs WSL; both undocumented for now)
-- [Obsidian](https://obsidian.md) and [Claude Code](https://claude.com/claude-code)
-  (paid Anthropic account)
-- `git`, `zsh`/`bash`, Python 3
-
-**Developer path**
+Both runnable pieces work on a fresh clone, no private data needed:
 
 ```bash
-git clone https://github.com/ibhugeloo/manin-control-room.git
-cd manin-control-room
-for f in memory/*.example.md;   do cp "$f" "${f%.example.md}.md"; done
-for f in config/*.example.yaml; do cp "$f" "${f%.example.yaml}.yaml"; done
-# Fill in memory/*.md + config/*.yaml, point @imports at your vault path:
-./bootstrap.sh
+# 1. The eval harness — offline, deterministic, stdlib-only (what gates CI)
+python3 tests/doctrine/runner.py
+
+# 2. The RAG showcase — local embeddings over an included sample corpus
+cd showcase/semantic-vault-search
+pip install "sentence-transformers>=2.7" sqlite-vec numpy
+python3 demo.py "how do I keep my services isolated?"
 ```
-
-`bootstrap.sh` symlinks `bin/` into `~/.local/bin`, wires the Claude Code hooks,
-and (optionally) installs the launchd routines. **Idempotent** — re-run to update.
-
-<details><summary><b>The gentle path</b> — no coding required, macOS, ~45 min</summary>
-
-**What you'll have at the end:** you type `claude` in a folder, and your
-assistant already knows who you are, your tone rules, and remembers things
-between conversations.
-
-> **Real talk first.** This runs on a **Mac**, needs a **paid Anthropic
-> account** (Claude Code), and you'll **copy-paste a few Terminal commands**.
-> Never opened Terminal? Fine — follow exactly, budget ~45 min. You do **not**
-> need Leo, Alfred, a homelab, or any routine to start.
-
-**1. Install the two apps**
-- [Obsidian](https://obsidian.md) — a free note-taking app. Becomes your assistant's memory (and yours).
-- [Claude Code](https://claude.com/claude-code) — Anthropic's terminal assistant. Follow their installer and sign in (the paid part).
-
-**2. Download this template (no git needed)**
-- Green **`Code`** button → **Download ZIP**. Unzip it, move it to **Documents**, rename to e.g. `my-jarvis`.
-
-**3. Open Terminal in that folder**
-- In Finder, right-click the folder → **Services** → **New Terminal at Folder**.
-
-**4. Turn the blank templates into your files** — paste, Enter:
-```bash
-for f in memory/*.example.md;   do cp "$f" "${f%.example.md}.md"; done
-for f in config/*.example.yaml; do cp "$f" "${f%.example.yaml}.yaml"; done
-```
-
-**5. Make it *yours* (the important part)**
-- Open Obsidian → **Open folder as vault** → pick `my-jarvis`.
-- Edit two files in plain words:
-  - `memory/jarvis_soul.md` — how it talks to you, and how much it does on its own vs. asks first.
-  - `memory/profil.md` — who you are: work, goals, preferences, what to never forget.
-- The more honest and specific, the better it gets. No software can do this part for you.
-
-**6. Switch it on** — paste, Enter:
-```bash
-./bootstrap.sh
-claude
-```
-Say hi. Ask *"what do you know about me?"* — it should answer from your profile.
-
-**7. Grow into it, slowly**
-Use it by hand for a week or two. When you wish it did something on a schedule,
-*then* turn on that one routine. Leo, Alfred and the homelab are **advanced
-add-ons** — open [`docs/`](./docs) when you actually want them.
-</details>
 
 ## Stack
 
@@ -334,11 +252,10 @@ Nothing exotic — the point is the *architecture*, not the dependencies.
   to **git** (the canon)
 - **sqlite-vec + sentence-transformers** — local semantic search, fully offline
 
-**Engine**
+**Engine** (private repo; the readable pieces are mirrored here)
 - ~30 **zsh/bash** scripts (dispatcher, routines, hooks, guards, UI server) +
   **Python 3** for the heavier bits
-- **Claude Code hooks + slash commands + path-scoped rules**, wired by
-  `bootstrap.sh`
+- **Claude Code hooks + slash commands + path-scoped rules**
 - macOS **launchd** templates — opt-in, every model-calling cron off by default
 
 **Runtimes**
@@ -348,14 +265,6 @@ Nothing exotic — the point is the *architecture*, not the dependencies.
 - **Alfred** — homelab sysadmin, scoped model
 
 macOS-first by design. No build step, no framework lock-in.
-
-## Roadmap
-
-- **Cross-platform** — engine assumes macOS; Linux needs tweaks, Windows needs WSL (undocumented).
-- **A real restore drill** — *prove* "git is the safety net": fresh clone → `bootstrap.sh` dry-run → verify HOT/WARM/rules rehydrate.
-- **Native vault dashboards** — query projects/decisions live (Obsidian Bases) instead of a static index (POC).
-- **Opportunistic web extraction** — content pre-filter + fetch fallback, source-tagged for provenance.
-- **Command ↔ headless-prompt sync** — a slash command and its cron prompt can drift silently; they need a shared source.
 
 ## Philosophy
 
@@ -388,6 +297,5 @@ Three things people tend to conflate — they sit at **different layers** and
 
 ## License
 
-**MIT** — see [`LICENSE`](./LICENSE). Sanitized reference; the real memory
-(profile, decisions, sessions) is never committed. Keep your filled-in
-`*.md` / `*.yaml` out of any public repo.
+**MIT** — see [`LICENSE`](./LICENSE). Sanitized, curated mirror; the real memory
+(profile, decisions, sessions) is never committed here.

@@ -37,9 +37,9 @@
 @__HOME__/Documents/Obsidian/vault/Claude/Memory/auto/_index.md
 
 # Doc des sous-systèmes Jarvis : non-auto-loadée. À lire à la demande dans :
-#   __HOME__/Documents/GIT PROD/manin-control-room/docs/
+#   __HOME__/Documents/GIT PROD/manin-porunga/docs/
 
 # lessons.md (post-mortem cumulatif) : descendu en WARM 2026-05-20 (~27 KB).
 # Lire sur trigger : "leçon", "post-mortem", "incident", "qu'est-ce qu'on a appris", "§N".
-# Path : __HOME__/Documents/GIT PROD/manin-control-room/lessons.md
+# Path : __HOME__/Documents/GIT PROD/manin-porunga/lessons.md
 # === END JARVIS IMPORTS ===
