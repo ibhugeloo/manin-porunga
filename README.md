@@ -70,7 +70,7 @@ flowchart TD
 | Component in this repo | AI-engineering competency |
 |------------------------|---------------------------|
 | Tiered **HOT/WARM/COLD** memory + **path-scoped rules** | **Context engineering** — deciding what enters the model's window, when, and why; managing token budget deliberately instead of dumping everything in |
-| Local embeddings search — `sqlite-vec` + `sentence-transformers`, fully offline | **Retrieval / RAG** — semantic search over a private corpus, no vendor lock-in, no data leaving the machine |
+| **Hybrid retrieval** — dense vectors (`sqlite-vec` + `sentence-transformers`) fused with FTS5 keyword search via Reciprocal Rank Fusion, plus a confidence gate; fully offline | **Retrieval / RAG** — hybrid dense + lexical search over a private corpus, no vendor lock-in, no data leaving the machine |
 | Jarvis / Leo / Alfred — three roles on **deliberately different models** | **Multi-agent orchestration** — role *and* model diversity so the agents don't share blind spots; one debates, I decide |
 | Doctrine scenarios in `tests/` | **LLM evaluation** — the assistant's behavior is *tested against scenarios*, not assumed correct |
 | "No background cron ever calls the LLM", opt-in routines, every model call logged | **LLMOps & cost control** — every inference is intentional, auditable, and off by default |
@@ -118,8 +118,9 @@ don't share blind spots. Jarvis and Leo debate; **I decide**.
   scored over cycles, auto-written to an audited probation folder, and purged
   if unused. Anything touching the **persona** or a **dated decision** requires
   my explicit yes — silence is never consent. The decision log is append-only.
-- **Semantic vault search** — local embeddings (`sqlite-vec` +
-  `sentence-transformers`), fully offline.
+- **Hybrid vault search** — local embeddings (`sqlite-vec` +
+  `sentence-transformers`) fused with FTS5 keyword recall (Reciprocal Rank
+  Fusion) behind a confidence gate, fully offline.
 - **Tested doctrine** — the persona's rules live in `tests/` as scenarios; the
   rules are *tested*, not just written.
 
@@ -183,7 +184,9 @@ non-determinism — exactly why the *deterministic* baseline backs the CI gate.
 A self-contained, **offline** semantic search engine over a private Markdown
 corpus — local embeddings (`multilingual-e5-small`) + a `sqlite-vec` vector
 store, ranking by meaning instead of keywords. The retrieval layer of a RAG
-system, decoupled from any LLM. It also demonstrates **grounded citations** (every
+system, decoupled from any LLM. The production engine goes further: **hybrid
+retrieval** — vector recall fused with FTS5 keyword recall via Reciprocal Rank
+Fusion, behind a confidence gate that refuses rather than guesses. It also demonstrates **grounded citations** (every
 hit cites its source chunk + score), a **refuse-to-answer** gate when nothing clears
 a similarity threshold (the anti-hallucination move), and a measured
 **naive-keyword vs semantic** comparison.

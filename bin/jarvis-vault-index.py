@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-jarvis-vault-index — Indexe le vault Obsidian + sessions Jarvis dans une DB sqlite-vec.
+jarvis-vault-index — Indexe le vault Obsidian + sessions assistant dans une DB sqlite-vec.
 
 Sources scannées :
 - ~/Documents/Obsidian/vault/                 (vault Obsidian complet, hors .obsidian)
-- ~/Documents/Obsidian/vault/Claude/Sessions/ (récaps de sessions Jarvis)
+- ~/Documents/Obsidian/vault/Claude/Sessions/ (récaps de sessions assistant)
 - ~/Documents/GIT PROD/manin-porunga/   (lessons.md, notes synthèse)
 
 Output : ~/.local/share/jarvis/vault.db (sqlite-vec, ~10-50 MB selon volume)
@@ -45,7 +45,7 @@ TELEGRAM_INDEXABLE = TELEGRAM_DIR / "telegram-conversations.md"
 
 # Sources à indexer (chemin, source_label)
 # On indexe le vault complet (qui contient déjà Memory/, Sessions/, Projects/) +
-# le repo Jarvis pour lessons.md / README / prompts (sans dédoublonner les mirrors) +
+# le repo assistant pour lessons.md / README / prompts (sans dédoublonner les mirrors) +
 # l'historique Telegram converti en .md (cf. sync_telegram_md).
 SOURCES = [
     (VAULT, "vault"),
@@ -58,8 +58,8 @@ EXCLUDE_PATTERNS = [
     ".obsidian", ".trash", ".git", "node_modules", ".venv", "venv",
     ".DS_Store", ".playwright-mcp",
     "Brief",                # briefs s'auto-régénèrent quotidiennement, bruit
-    # Dans le repo Jarvis, ces dossiers sont des mirrors du vault → doublons
-    "memory", "sessions", "obsidian-projects",
+    # Dans le repo assistant, ces dossiers sont des mirrors du vault → doublons
+    "memory", "sessions", "obsidian-projects", "obsidian-vault",
 ]
 
 # Cap de taille des chunks (caractères)
@@ -123,6 +123,12 @@ def init_schema(db: sqlite3.Connection) -> None:
         CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks USING vec0(
             chunk_id INTEGER PRIMARY KEY,
             embedding FLOAT[{EMBEDDING_DIM}]
+        );
+
+        CREATE VIRTUAL TABLE IF NOT EXISTS fts_chunks USING fts5(
+            text,
+            chunk_id UNINDEXED,
+            tokenize = 'unicode61 remove_diacritics 2'
         );
     """)
     db.commit()
@@ -262,7 +268,23 @@ def reindex_file(db: sqlite3.Connection, model, source: str, path: Path) -> tupl
 
     cur = db.cursor()
 
-    # Delete previous file + chunks (CASCADE)
+    # Delete previous file + ses chunks + embeddings.
+    # NB: pas de cascade FK réel (PRAGMA foreign_keys OFF par défaut, et vec_chunks
+    # est une table virtuelle vec0 hors cascade) -> suppression manuelle obligatoire.
+    cur.execute(
+        "DELETE FROM vec_chunks WHERE chunk_id IN "
+        "(SELECT id FROM chunks WHERE file_id IN (SELECT id FROM files WHERE path = ?))",
+        (str(path),),
+    )
+    cur.execute(
+        "DELETE FROM fts_chunks WHERE chunk_id IN "
+        "(SELECT id FROM chunks WHERE file_id IN (SELECT id FROM files WHERE path = ?))",
+        (str(path),),
+    )
+    cur.execute(
+        "DELETE FROM chunks WHERE file_id IN (SELECT id FROM files WHERE path = ?)",
+        (str(path),),
+    )
     cur.execute("DELETE FROM files WHERE path = ?", (str(path),))
 
     # Insert file
@@ -283,6 +305,11 @@ def reindex_file(db: sqlite3.Connection, model, source: str, path: Path) -> tupl
         cur.execute(
             "INSERT INTO vec_chunks (chunk_id, embedding) VALUES (?, ?)",
             (chunk_id, json.dumps(vec)),
+        )
+        # Index plein-texte (FTS5) pour le retrieval hybride mots-clés + sémantique
+        cur.execute(
+            "INSERT INTO fts_chunks (text, chunk_id) VALUES (?, ?)",
+            (chunk, chunk_id),
         )
 
     db.commit()
@@ -309,6 +336,17 @@ def cleanup_deleted(db: sqlite3.Connection, current_paths: set[str]) -> int:
     deleted = 0
     for fid, fpath in rows:
         if fpath not in current_paths:
+            db.execute(
+                "DELETE FROM vec_chunks WHERE chunk_id IN "
+                "(SELECT id FROM chunks WHERE file_id = ?)",
+                (fid,),
+            )
+            db.execute(
+                "DELETE FROM fts_chunks WHERE chunk_id IN "
+                "(SELECT id FROM chunks WHERE file_id = ?)",
+                (fid,),
+            )
+            db.execute("DELETE FROM chunks WHERE file_id = ?", (fid,))
             db.execute("DELETE FROM files WHERE id = ?", (fid,))
             deleted += 1
     if deleted:
@@ -360,7 +398,7 @@ def sync_telegram_md() -> int:
             dt_label = first_ts
         out.append(f"## Échange {dt_label}\n\n")
         for t in current_exchange:
-            role = "**Vous**" if t.get("role") == "user" else "**Jarvis**"
+            role = "**Vous**" if t.get("role") == "user" else "**Assistant**"
             content = (t.get("content") or "").strip()
             out.append(f"{role} : {content}\n\n")
         out.append("---\n\n")

@@ -70,7 +70,7 @@ FUTURE_COUNT=$((CURRENT_COUNT + NEW_FILE))
 # Seuil : 16 fichiers max top-level (on est à 12 + observations.md = 13, marge raisonnable)
 MAX_FILES=14
 if [[ $FUTURE_COUNT -gt $MAX_FILES ]]; then
-  REASON="Memory/ atteindrait $FUTURE_COUNT fichiers top-level (seuil: $MAX_FILES, durci 2026-05-09). Anti-drift actif (cf. lessons.md §18). Choisir : (a) consolider dans un fichier existant, (b) déplacer vers _archives/, (c) déplacer la doc technique vers manin-control-room/docs/, (d) override avec env JARVIS_MEMORY_GUARD_BYPASS=1."
+  REASON="Memory/ atteindrait $FUTURE_COUNT fichiers top-level (seuil: $MAX_FILES, durci 2026-05-09). Anti-drift actif (cf. lessons.md §18). Choisir : (a) consolider dans un fichier existant, (b) déplacer vers _archives/, (c) déplacer la doc technique vers manin-porunga/docs/, (d) override avec env JARVIS_MEMORY_GUARD_BYPASS=1."
   echo "[$(date)] BLOCK: count=$FUTURE_COUNT > $MAX_FILES — $FILE_PATH" >> "$LOG"
   jq -n --arg reason "$REASON" '{decision: "block", reason: $reason}'
   exit 0
@@ -110,7 +110,7 @@ MAX_FILE_SIZE=20480
 if [[ $NEW_SIZE -gt $MAX_FILE_SIZE ]]; then
   KB=$((NEW_SIZE / 1024))
   CAP_KB=$((MAX_FILE_SIZE / 1024))
-  REASON="$BASENAME atteindrait ~${KB} KB (seuil: ${CAP_KB} KB). Probable drift de doc technique dans la mémoire cognitive (cf. lessons.md §18). Choisir : (a) scinder en plusieurs concepts, (b) déplacer vers manin-control-room/docs/ si c'est de la doc système, (c) relever le plafond du hook si croissance par design assumée, (d) override avec env JARVIS_MEMORY_GUARD_BYPASS=1."
+  REASON="$BASENAME atteindrait ~${KB} KB (seuil: ${CAP_KB} KB). Probable drift de doc technique dans la mémoire cognitive (cf. lessons.md §18). Choisir : (a) scinder en plusieurs concepts, (b) déplacer vers manin-porunga/docs/ si c'est de la doc système, (c) relever le plafond du hook si croissance par design assumée, (d) override avec env JARVIS_MEMORY_GUARD_BYPASS=1."
   echo "[$(date)] BLOCK: size=${NEW_SIZE}B > ${MAX_FILE_SIZE}B — $FILE_PATH" >> "$LOG"
   jq -n --arg reason "$REASON" '{decision: "block", reason: $reason}'
   exit 0

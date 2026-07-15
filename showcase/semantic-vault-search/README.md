@@ -380,8 +380,11 @@ modules by path and calls their real functions:
 
 The grounding/refusal/naive-baseline layers are **demo-only additions on top of**
 that shared retrieval — they wrap the production query path, they don't alter it.
-The refusal gate and the keyword baseline live entirely in `demo.py`; the
-production CLI is the raw ranked retriever, exactly as imported.
+The demo's refusal gate and keyword baseline live in `demo.py` for
+illustration. The production CLI has since gone further: **hybrid retrieval**
+— vector KNN fused with FTS5 keyword recall via Reciprocal Rank Fusion (RRF),
+behind its own confidence gate (low best-similarity with zero keyword
+corroboration → refuse rather than guess).
 
 The only thing the demo substitutes is the **corpus** (tiny public fixtures
 instead of the private vault) and the **DB location** (in-memory instead of
