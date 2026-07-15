@@ -9,6 +9,15 @@
 </p>
 
 <p align="center">
+  <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/claude-ai.svg" width="30" title="Claude Code" alt="Claude" />&nbsp;&nbsp;
+  <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/obsidian.svg" width="30" title="Obsidian vault — the memory" alt="Obsidian" />&nbsp;&nbsp;
+  <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/github.svg" width="30" title="git — the canon" alt="GitHub" />&nbsp;&nbsp;
+  <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/python.svg" width="30" title="Python — engine & evals" alt="Python" />&nbsp;&nbsp;
+  <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/telegram.svg" width="30" title="Telegram — Leo, the contrarian" alt="Telegram" />&nbsp;&nbsp;
+  <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/notion.svg" width="30" title="Notion — disposable mirror" alt="Notion" />
+</p>
+
+<p align="center">
   <strong>A reliable AI agent on top of an LLM — durable Markdown memory, eval-tested guardrails, zero hidden LLM calls.</strong><br />
   The memory is a Markdown vault, the canon is git, the model runs only when I say so.
 </p>
