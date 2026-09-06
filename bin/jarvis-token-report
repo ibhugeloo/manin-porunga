@@ -1,0 +1,316 @@
+#!/usr/bin/env python3
+"""jarvis-token-report — observabilité mécanique de la dépense tokens Porunga.
+
+Parse les transcripts Claude Code (~/.claude/projects/**/*.jsonl), agrège la
+fenêtre 30j et la fenêtre 30j précédente, et rend :
+  - tokens par modèle (input / output / cache read / cache write)
+  - ratio de cache (part du volume servie par le prompt caching Anthropic)
+  - coût équivalent API (indicatif — Idriss est sur abonnement, c'est du quota)
+  - delta vs fenêtre précédente + verdict seuillé 🟢/🟡/🔴
+
+Décision 2026-07-29 (mandat /goal cache Porunga, convergence Leo) : pas de
+brique cache externe (GPTCache/Bifrost = 0% hit mesuré sur 1375 appels headless,
+zéro prompt dupliqué réel) — le cache performant existant est le prompt caching
+Anthropic natif. Ce script est le garde-fou §16 : il rend les arbitrages tokens
+chiffrés au lieu d'intuitifs.
+
+Usage :
+    jarvis-token-report              # tableau humain 30j + delta + verdict
+    jarvis-token-report --check     # une ligne verdict (injection routine eval)
+    jarvis-token-report --json      # dump JSON complet
+    jarvis-token-report --days N    # fenêtre custom (défaut 30)
+
+Verdicts (--check) :
+    🔴  cache read ratio < 80%  (le prompt caching ne joue plus son rôle)
+        OU coût 30j > +50% vs fenêtre précédente
+    🟡  coût 30j > +20% vs fenêtre précédente
+    🟢  sinon
+
+0 réseau, 0 LLM, stdlib pure. Sortie toujours explicite si les données
+manquent (jamais de verdict 🟢 sans source — cf. skill mcp-indisponible).
+"""
+
+import json
+import sys
+import time
+from datetime import datetime
+from pathlib import Path
+
+PROJECTS_DIR = Path.home() / ".claude" / "projects"
+CODEX_DIR = Path.home() / ".codex" / "sessions"
+
+
+def timestamp(value):
+    return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
+
+
+def supplemental_usage(start, end, codex_dir=None, model_log=None):
+    """Périmètres séparés : jamais ajouter les traces Codex à Claude (Orca peut dupliquer)."""
+    codex_dir = CODEX_DIR if codex_dir is None else codex_dir
+    model_log = model_log or Path.home() / ".local/var/log/claude-p-robust.log"
+    totals = dict(input_tokens=0, cached_input_tokens=0, output_tokens=0)
+    sessions, seen = set(), set()
+    for path in codex_dir.rglob("*.jsonl"):
+        previous = dict.fromkeys(totals, 0)
+        session = str(path)
+        try:
+            with path.open(errors="replace") as stream:
+                for line in stream:
+                    try:
+                        row = json.loads(line)
+                        payload = row.get("payload") or {}
+                        if row.get("type") == "session_meta":
+                            session = payload.get("id", session)
+                        if payload.get("type") != "token_count":
+                            continue
+                        usage = (payload.get("info") or {}).get("total_token_usage")
+                        if not usage:
+                            continue
+                        current = {k: int(usage.get(k, 0)) for k in totals}
+                        delta = {k: max(0, current[k] - previous[k]) for k in totals}
+                        previous = current
+                        key = (session, row.get("timestamp"), tuple(current.values()))
+                        if key in seen or not start <= timestamp(row["timestamp"]) < end:
+                            continue
+                        seen.add(key)
+                        sessions.add(session)
+                        for key in totals:
+                            totals[key] += delta[key]
+                    except (ValueError, TypeError, KeyError):
+                        continue
+        except OSError:
+            continue
+    workflows = {}
+    if model_log.is_file():
+        with model_log.open(errors="replace") as stream:
+            for line in stream:
+                try:
+                    row = json.loads(line)
+                    if not start <= row["timestamp"] < end:
+                        continue
+                    key = row["engine"] + ":" + row["workflow"]
+                    item = workflows.setdefault(key, dict(attempts=0, failures=0, duration_s=0))
+                    item["attempts"] += 1
+                    item["failures"] += int(row["exit"] != 0)
+                    item["duration_s"] += row["duration_s"]
+                except (ValueError, TypeError, KeyError):
+                    continue
+    return dict(codex_local=dict(status="observed" if sessions else "unavailable",
+                                sessions=len(sessions), **totals),
+                workflows=workflows, hermes_remote="unavailable: remote traces not collected",
+                aggregation="Separate scopes; possible Orca overlap; no global total",
+                pricing="Historical weights, not current prices, invoice or subscription quota")
+
+# Prix API par million de tokens : (input, output, cache_write_5m, cache_read).
+# Indicatif : sert de pondération stable pour comparer des fenêtres, pas de
+# facture réelle (abonnement). Modèles claude inconnus → tarif opus (majorant).
+PRICING = {
+    "opus": (15.0, 75.0, 18.75, 1.50),
+    "sonnet": (3.0, 15.0, 3.75, 0.30),
+    "haiku": (1.0, 5.0, 1.25, 0.10),
+}
+
+
+def price_for(model: str):
+    m = model.lower()
+    for family, p in PRICING.items():
+        if family in m:
+            return p
+    if m.startswith("claude") or "fable" in m:
+        return PRICING["opus"]
+    return None  # modèle non-Anthropic (gpt-* via Orca) : tokens comptés, coût exclu
+
+
+def scan(window_start: float, window_end: float):
+    """Agrège usage par modèle sur [window_start, window_end). Dédup par requestId/message.id.
+
+    Retourne aussi le coût équivalent par jour (pour les gates anti-spike /
+    échantillon minimal — durcissement Leo 2026-07-29)."""
+    agg = {}  # model -> [input, output, cache_read, cache_write]
+    day_costs = {}  # "YYYY-MM-DD" -> coût équiv. USD
+    seen = set()
+    files = 0
+    if not PROJECTS_DIR.is_dir():
+        return agg, 0, day_costs
+    for f in PROJECTS_DIR.rglob("*.jsonl"):
+        # un fichier plus vieux que le début de fenêtre ne peut pas contenir d'entrées dedans
+        try:
+            if f.stat().st_mtime < window_start:
+                continue
+        except OSError:
+            continue
+        files += 1
+        try:
+            with open(f, "r", errors="replace") as fh:
+                for line in fh:
+                    if '"usage"' not in line:
+                        continue
+                    try:
+                        d = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    msg = d.get("message") or {}
+                    usage = msg.get("usage")
+                    if not usage:
+                        continue
+                    ts = d.get("timestamp")
+                    if ts:
+                        try:
+                            t = timestamp(ts)
+                        except ValueError:
+                            t = None
+                        if t is not None and not (window_start <= t < window_end):
+                            continue
+                    key = d.get("requestId") or msg.get("id")
+                    if key:
+                        if key in seen:
+                            continue
+                        seen.add(key)
+                    model = msg.get("model") or "unknown"
+                    if model == "<synthetic>":
+                        continue
+                    a = agg.setdefault(model, [0, 0, 0, 0])
+                    i = usage.get("input_tokens", 0)
+                    o = usage.get("output_tokens", 0)
+                    r = usage.get("cache_read_input_tokens", 0)
+                    w = usage.get("cache_creation_input_tokens", 0)
+                    a[0] += i
+                    a[1] += o
+                    a[2] += r
+                    a[3] += w
+                    p = price_for(model)
+                    if p and ts:
+                        day = ts[:10]
+                        day_costs[day] = day_costs.get(day, 0.0) + \
+                            (i * p[0] + o * p[1] + w * p[2] + r * p[3]) / 1e6
+        except OSError:
+            continue
+    return agg, files, day_costs
+
+
+def totals(agg):
+    tot = [0, 0, 0, 0]
+    cost = 0.0
+    for model, (inp, out, cr, cw) in agg.items():
+        tot[0] += inp
+        tot[1] += out
+        tot[2] += cr
+        tot[3] += cw
+        p = price_for(model)
+        if p:
+            cost += (inp * p[0] + out * p[1] + cw * p[2] + cr * p[3]) / 1e6
+    return tot, cost
+
+
+def fmt_m(n):
+    return f"{n / 1e6:.1f}M" if n >= 1e5 else f"{n / 1e3:.0f}k"
+
+
+def main():
+    args = sys.argv[1:]
+    days = 30
+    if "--days" in args:
+        days = int(args[args.index("--days") + 1])
+    now = time.time()
+    coverage = supplemental_usage(now - days * 86400, now)
+    cur, files, _ = scan(now - days * 86400, now)
+    # Delta sur demi-fenêtres courtes : les transcripts sont purgés à ~30j par
+    # Claude Code, donc "30j vs 30j précédents" comparerait à une fenêtre vide.
+    delta_days = min(days // 2, 14) or 1
+    recent, _, recent_days = scan(now - delta_days * 86400, now)
+    prev, _, prev_days = scan(now - 2 * delta_days * 86400, now - delta_days * 86400)
+
+    if not cur:
+        if "--json" in args:
+            print(json.dumps(dict(days=days, models={}, verdict="unknown", coverage=coverage)))
+            return
+        print(f"⚠️ token-report : aucune donnée d'usage trouvée sous {PROJECTS_DIR} "
+              f"({files} fichiers scannés) — verdict impossible, ne pas conclure 🟢.")
+        sys.exit(0)
+
+    (inp, out, cr, cw), cost = totals(cur)
+    _, recent_cost = totals(recent)
+    _, prev_cost = totals(prev)
+    total_in = inp + cr + cw
+    cache_ratio = (cr / total_in * 100) if total_in else 0.0
+    delta_pct = ((recent_cost - prev_cost) / prev_cost * 100) if prev_cost > 1 else None
+
+    # Gates anti-faux-positif (durcissement Leo 2026-07-29) : un jour "actif"
+    # coûte ≥ $0.5 équiv. Le delta total seul ne pilote jamais un 🔴 — il faut
+    # que la médiane quotidienne monte aussi (sinon = session lourde ponctuelle),
+    # un échantillon suffisant (≥7j actifs par fenêtre), et pas de spike dominant
+    # (top jour > 40% de la fenêtre → warning, pas verdict dur).
+    def day_stats(dc):
+        active = sorted(c for c in dc.values() if c >= 0.5)
+        if not active:
+            return 0, 0.0, 0.0
+        n = len(active)
+        med = active[n // 2] if n % 2 else (active[n // 2 - 1] + active[n // 2]) / 2
+        return n, med, max(active) / sum(active)
+
+    r_days, r_median, r_top = day_stats(recent_days)
+    p_days, p_median, _ = day_stats(prev_days)
+    median_delta = ((r_median - p_median) / p_median * 100) if p_median > 0.5 else None
+    weak_sample = min(r_days, p_days) < 7
+    stats_note = (f"{r_days}j actifs, médiane ${r_median:.0f}/j, "
+                  f"top jour {r_top * 100:.0f}% de la fenêtre")
+
+    if cache_ratio < 80:
+        verdict = "🔴"
+        why = f"cache ratio {cache_ratio:.0f}% < 80% — le prompt caching ne couvre plus le volume"
+    elif delta_pct is not None and delta_pct > 50:
+        base = f"coût +{delta_pct:.0f}% sur {delta_days}j vs {delta_days}j précédents"
+        if weak_sample:
+            verdict, why = "🟡", f"{base} MAIS échantillon faible ({min(r_days, p_days)}j actifs < 7) — pas de verdict dur ({stats_note})"
+        elif median_delta is not None and median_delta > 50:
+            verdict, why = "🔴", f"dérive structurelle : {base} ET médiane quotidienne +{median_delta:.0f}% ({stats_note})"
+        elif r_top > 0.40:
+            verdict, why = "🟡", f"spike ponctuel : {base}, mais le top jour domine ({stats_note}) — pas une dérive"
+        else:
+            verdict, why = "🟡", f"{base} sans hausse de la médiane quotidienne — probable session lourde, à surveiller ({stats_note})"
+    elif delta_pct is not None and delta_pct > 20:
+        verdict, why = "🟡", f"coût +{delta_pct:.0f}% sur {delta_days}j vs {delta_days}j précédents (seuil warn 20% ; {stats_note})"
+    else:
+        d = f"{delta_pct:+.0f}%" if delta_pct is not None else "n/a (pas de fenêtre précédente)"
+        verdict, why = "🟢", f"cache ratio {cache_ratio:.0f}%, delta coût {d} ({stats_note})"
+
+    check_line = (f"{verdict} tokens {days}j : {fmt_m(total_in + out)} total "
+                  f"(indice historique ${cost:.0f}), cache ratio {cache_ratio:.0f}% — {why}; périmètre Claude local, flotte non couverte")
+
+    if "--check" in args:
+        print(check_line)
+        return
+
+    if "--json" in args:
+        print(json.dumps({
+            "days": days,
+            "coverage": coverage,
+            "models": {m: {"input": v[0], "output": v[1], "cache_read": v[2],
+                           "cache_write": v[3]} for m, v in cur.items()},
+            "cost_equiv_usd": round(cost, 2),
+            "delta_days": delta_days,
+            "recent_cost_equiv_usd": round(recent_cost, 2),
+            "prev_cost_equiv_usd": round(prev_cost, 2),
+            "recent_active_days": r_days,
+            "recent_median_daily_usd": round(r_median, 2),
+            "recent_top_day_share_pct": round(r_top * 100, 1),
+            "median_delta_pct": round(median_delta, 1) if median_delta is not None else None,
+            "cache_read_ratio_pct": round(cache_ratio, 1),
+            "verdict": verdict,
+        }, indent=2))
+        return
+
+    print(f"# Dépense tokens — {days} derniers jours\n")
+    print(f"{'modèle':<30} {'input':>8} {'output':>8} {'cache rd':>9} {'cache wr':>9} {'coût eq':>8}")
+    for model, (i, o, r, w) in sorted(cur.items(), key=lambda kv: -sum(kv[1])):
+        p = price_for(model)
+        c = f"${(i * p[0] + o * p[1] + w * p[2] + r * p[3]) / 1e6:.0f}" if p else "—"
+        print(f"{model:<30} {fmt_m(i):>8} {fmt_m(o):>8} {fmt_m(r):>9} {fmt_m(w):>9} {c:>8}")
+    print(f"\nTotal : {fmt_m(total_in + out)} tokens, ~${cost:.0f} équiv. API "
+          f"(delta {delta_days}j : ~${recent_cost:.0f} vs ~${prev_cost:.0f} précédents)")
+    print(check_line)
+    print(json.dumps(coverage, ensure_ascii=False, indent=2))
+
+
+if __name__ == "__main__":
+    main()

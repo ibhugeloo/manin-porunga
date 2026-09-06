@@ -1,0 +1,289 @@
+#!/usr/bin/env python3
+"""Projette la doctrine et les skills Porunga dans Codex/Orca.
+
+La source de vérité reste le vault Namek et le dépôt porunga. Le bridge
+génère un bloc géré dans ``~/.codex/AGENTS.md`` et expose les skills exportés
+par des symlinks individuels dans ``~/.codex/skills/``. Tout contenu utilisateur
+placé hors du bloc géré est préservé.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import sys
+from pathlib import Path
+
+
+BEGIN = "<!-- BEGIN PORUNGA CODEX BRIDGE -->"
+END = "<!-- END PORUNGA CODEX BRIDGE -->"
+MANAGED_RE = re.compile(
+    rf"(?:\n*){re.escape(BEGIN)}.*?{re.escape(END)}(?:\n*)",
+    re.DOTALL,
+)
+
+PREAMBLE = """# Porunga — Codex/Orca
+Projection gérée par jarvis-codex-bridge ; ne pas éditer ce bloc. Identité transparente : Codex/Orca avec Porunga chargé, jamais Claude Code.
+Les quatre sources HOT ci-dessous font foi sous les instructions système/développeur/utilisateur et projet. WARM : suivre agents.md §10 avant de répondre sur le sujet concerné.
+Vault Namek = atelier, porunga = canon Git ; jamais éditer porunga/memory/ ni skills/. Pour chercher : ~/Documents/Obsidian/Namek/_vault-index.md puis note ciblée ; symptôme technique : Claude/Memory/auto/_dispatcher.md. Skills exposés sous ~/.codex/skills/, lire le SKILL.md pertinent.
+Après modification de doctrine, lancer jarvis-codex-bridge. Refresh aussi via vault-index-build/memory-sync ; aucun nouveau cron. Une session ouverte garde son contexte initial : effet dans une nouvelle session.
+"""
+
+
+def paths() -> tuple[Path, Path, Path]:
+    home = Path.home()
+    vault = Path(
+        os.environ.get(
+            "JARVIS_VAULT", str(home / "Documents" / "Obsidian" / "Namek")
+        )
+    )
+    repo = Path(
+        os.environ.get(
+            "JARVIS_REPO",
+            str(home / "Documents" / "GIT PROD" / "water-seven" / "porunga"),
+        )
+    )
+    codex_home = Path(os.environ.get("JARVIS_CODEX_HOME", str(home / ".codex")))
+    return vault, repo, codex_home
+
+
+def source_files(vault: Path) -> list[tuple[str, Path]]:
+    memory = vault / "Claude" / "Memory"
+    return [
+        ("SOUL — identité et règles d'action", memory / "jarvis_soul.md"),
+        ("PROFIL — Idriss Bhugeloo", memory / "profil.md"),
+        ("DÉCISIONS — choix structurants", memory / "decisions.md"),
+        ("AGENTS — workflows opérationnels", memory / "agents.md"),
+    ]
+
+
+def build_block(vault: Path) -> str:
+    sections = [BEGIN, PREAMBLE.rstrip()]
+    for label, path in source_files(vault):
+        if not path.is_file():
+            raise FileNotFoundError(f"source HOT introuvable : {path}")
+        body = path.read_text(encoding="utf-8").strip()
+        sections.extend(
+            [
+                "",
+                f"---\n\n# SOURCE HOT : {label}",
+                f"\nSource : `{path}`\n",
+                body,
+            ]
+        )
+    sections.extend(["", END])
+    return "\n".join(sections).rstrip() + "\n"
+
+
+def merge_managed_block(existing: str, block: str) -> str:
+    has_begin = BEGIN in existing
+    has_end = END in existing
+    if has_begin != has_end:
+        raise ValueError("bloc Porunga incomplet dans AGENTS.md; correction manuelle requise")
+    if has_begin:
+        if len(MANAGED_RE.findall(existing)) != 1:
+            raise ValueError("plusieurs blocs Porunga détectés dans AGENTS.md")
+        preserved = MANAGED_RE.sub("\n", existing).strip()
+    else:
+        preserved = existing.strip()
+    return block if not preserved else f"{block}\n{preserved}\n"
+
+
+def atomic_write(path: Path, content: str) -> bool:
+    if path.is_file() and path.read_text(encoding="utf-8") == content:
+        return False
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.porunga-tmp-{os.getpid()}")
+    tmp.write_text(content, encoding="utf-8")
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, path)
+    return True
+
+
+def is_managed_skill_link(path: Path, skills_src: Path) -> bool:
+    if not path.is_symlink():
+        return False
+    raw = os.readlink(path)
+    target = Path(raw) if os.path.isabs(raw) else path.parent / raw
+    try:
+        target_resolved = target.resolve()
+        source_resolved = skills_src.resolve()
+        return os.path.commonpath([target_resolved, source_resolved]) == str(source_resolved)
+    except (ValueError, FileNotFoundError):
+        return False
+
+
+def expected_skills(skills_src: Path) -> dict[str, Path]:
+    if not skills_src.is_dir():
+        raise FileNotFoundError(f"bibliothèque skills introuvable : {skills_src}")
+    result: dict[str, Path] = {}
+    for skill_md in sorted(skills_src.glob("*/SKILL.md")):
+        result[skill_md.parent.name] = skill_md.parent
+    if not result:
+        raise RuntimeError(f"aucun skill exporté dans {skills_src}")
+    return result
+
+
+def sync_skills(skills_src: Path, skills_dst: Path) -> tuple[int, int, list[str]]:
+    expected = expected_skills(skills_src)
+    skills_dst.mkdir(parents=True, exist_ok=True)
+    removed = 0
+    warnings: list[str] = []
+
+    for child in skills_dst.iterdir():
+        if not is_managed_skill_link(child, skills_src):
+            continue
+        raw = os.readlink(child)
+        current = Path(raw) if os.path.isabs(raw) else child.parent / raw
+        if child.name not in expected or current.resolve() != expected[child.name].resolve():
+            child.unlink()
+            removed += 1
+
+    linked = 0
+    for name, source in expected.items():
+        target = skills_dst / name
+        if target.is_symlink():
+            raw = os.readlink(target)
+            current = Path(raw) if os.path.isabs(raw) else target.parent / raw
+            if current.resolve() == source.resolve() and "water-seven/control-room" not in raw:
+                linked += 1
+                continue
+            if is_managed_skill_link(target, skills_src):
+                target.unlink()
+            else:
+                warnings.append(f"collision non gérée, skill ignoré : {target}")
+                continue
+        elif target.exists():
+            warnings.append(f"collision non gérée, skill ignoré : {target}")
+            continue
+        target.symlink_to(source, target_is_directory=True)
+        linked += 1
+    return linked, removed, warnings
+
+
+def check(vault: Path, repo: Path, codex_home: Path) -> dict[str, object]:
+    agents_path = codex_home / "AGENTS.md"
+    skills_src = repo / "skills"
+    skills_dst = codex_home / "skills"
+    expected_block = build_block(vault)
+    agents_ok = agents_path.is_file() and expected_block in agents_path.read_text(
+        encoding="utf-8"
+    )
+    expected = expected_skills(skills_src)
+    missing = []
+    for name, source in expected.items():
+        target = skills_dst / name
+        if not target.is_symlink():
+            missing.append(name)
+            continue
+        raw = os.readlink(target)
+        current = Path(raw) if os.path.isabs(raw) else target.parent / raw
+        if current.resolve() != source.resolve():
+            missing.append(name)
+    stale = []
+    if skills_dst.is_dir():
+        for child in skills_dst.iterdir():
+            if is_managed_skill_link(child, skills_src) and child.name not in expected:
+                stale.append(child.name)
+    return {
+        "ok": agents_ok and not missing and not stale,
+        "agents_ok": agents_ok,
+        "skill_count": len(expected),
+        "missing_skills": missing,
+        "stale_skills": stale,
+        "agents_path": str(agents_path),
+    }
+
+
+def uninstall(repo: Path, codex_home: Path) -> dict[str, int | bool]:
+    agents_path = codex_home / "AGENTS.md"
+    agents_changed = False
+    if agents_path.is_file():
+        existing = agents_path.read_text(encoding="utf-8")
+        if BEGIN in existing or END in existing:
+            if (BEGIN in existing) != (END in existing):
+                raise ValueError("bloc Porunga incomplet dans AGENTS.md")
+            remaining = MANAGED_RE.sub("\n", existing).strip()
+            if remaining:
+                atomic_write(agents_path, remaining + "\n")
+            else:
+                agents_path.unlink()
+            agents_changed = True
+
+    removed = 0
+    skills_src = repo / "skills"
+    skills_dst = codex_home / "skills"
+    if skills_dst.is_dir():
+        for child in skills_dst.iterdir():
+            if is_managed_skill_link(child, skills_src):
+                child.unlink()
+                removed += 1
+    return {"agents_changed": agents_changed, "skills_removed": removed}
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--check", action="store_true", help="vérifie sans modifier")
+    parser.add_argument(
+        "--uninstall", action="store_true", help="retire uniquement le bridge géré"
+    )
+    parser.add_argument("--json", action="store_true", help="sortie JSON")
+    args = parser.parse_args()
+
+    vault, repo, codex_home = paths()
+    try:
+        if args.uninstall:
+            result = uninstall(repo, codex_home)
+            ok = True
+        elif args.check:
+            result = check(vault, repo, codex_home)
+            ok = bool(result["ok"])
+        else:
+            agents_path = codex_home / "AGENTS.md"
+            existing = agents_path.read_text(encoding="utf-8") if agents_path.is_file() else ""
+            agents_changed = atomic_write(
+                agents_path, merge_managed_block(existing, build_block(vault))
+            )
+            linked, removed, warnings = sync_skills(repo / "skills", codex_home / "skills")
+            result = {
+                "ok": not warnings,
+                "agents_changed": agents_changed,
+                "agents_path": str(agents_path),
+                "skill_count": linked,
+                "stale_skills_removed": removed,
+                "warnings": warnings,
+            }
+            ok = not warnings
+    except (OSError, RuntimeError, ValueError) as exc:
+        result = {"ok": False, "error": str(exc)}
+        ok = False
+
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    elif ok:
+        if args.check:
+            print(
+                f"✅ Bridge Porunga valide : {result['skill_count']} skills, "
+                f"doctrine globale à jour"
+            )
+        elif args.uninstall:
+            print(
+                "✅ Bridge Porunga retiré : "
+                f"{result['skills_removed']} skill(s), bloc global="
+                f"{result['agents_changed']}"
+            )
+        else:
+            state = "mise à jour" if result["agents_changed"] else "inchangée"
+            print(
+                f"✅ Porunga → Codex/Orca : doctrine {state}, "
+                f"{result['skill_count']} skills actifs"
+            )
+    else:
+        print(f"❌ Bridge Porunga invalide : {result}", file=sys.stderr)
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

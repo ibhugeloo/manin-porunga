@@ -11,13 +11,11 @@
 
 set -uo pipefail
 
+JARVIS_VAULT="${JARVIS_VAULT:-$HOME/Documents/Obsidian/vault}"
+JARVIS_REPO="${JARVIS_REPO:-$HOME/Documents/GIT PROD/manin-porunga}"
+
 LOG="$HOME/.local/var/log/jarvis-memory-guard.log"
 mkdir -p "$(dirname "$LOG")"
-
-# Bypass explicite
-if [[ "${JARVIS_MEMORY_GUARD_BYPASS:-0}" == "1" ]]; then
-  exit 0
-fi
 
 INPUT=$(cat)
 
@@ -30,8 +28,41 @@ case "$TOOL_NAME" in
   *) exit 0 ;;
 esac
 
+# Les processus Claude headless déclarent explicitement les racines où ils
+# peuvent écrire. Cette barrière s'applique AVANT le bypass anti-bloat : un
+# sous-processus non interactif ne doit jamais pouvoir élargir lui-même son
+# périmètre d'écriture.
+if [[ -n "${JARVIS_HEADLESS_WRITE_ROOTS:-}" ]]; then
+  if ! python3 - "$FILE_PATH" "$JARVIS_HEADLESS_WRITE_ROOTS" <<'PY'
+import os
+import pathlib
+import sys
+
+target = pathlib.Path(sys.argv[1]).expanduser().resolve(strict=False)
+roots = [
+    pathlib.Path(raw).expanduser().resolve(strict=False)
+    for raw in sys.argv[2].split(os.pathsep)
+    if raw
+]
+allowed = any(target == root or root in target.parents for root in roots)
+raise SystemExit(0 if allowed else 1)
+PY
+  then
+    REASON="Écriture headless hors périmètre bloquée : $FILE_PATH. Racines autorisées : $JARVIS_HEADLESS_WRITE_ROOTS"
+    echo "[$(date)] BLOCK HEADLESS: $TOOL_NAME $FILE_PATH" >> "$LOG"
+    jq -n --arg reason "$REASON" '{decision: "block", reason: $reason}'
+    exit 0
+  fi
+fi
+
+# Bypass explicite de l'anti-bloat uniquement. Il ne désactive pas la frontière
+# headless ci-dessus.
+if [[ "${JARVIS_MEMORY_GUARD_BYPASS:-0}" == "1" ]]; then
+  exit 0
+fi
+
 # Filtre : doit cibler Memory/ top-level (pas _archives, pas auto, pas observations.md sous-dirs)
-MEMORY_DIR="$HOME/Documents/Obsidian/vault/Claude/Memory"
+MEMORY_DIR="$JARVIS_VAULT/Claude/Memory"
 case "$FILE_PATH" in
   "$MEMORY_DIR"/*.md) ;;  # OK, top-level
   *) exit 0 ;;
@@ -70,7 +101,7 @@ FUTURE_COUNT=$((CURRENT_COUNT + NEW_FILE))
 # Seuil : 16 fichiers max top-level (on est à 12 + observations.md = 13, marge raisonnable)
 MAX_FILES=14
 if [[ $FUTURE_COUNT -gt $MAX_FILES ]]; then
-  REASON="Memory/ atteindrait $FUTURE_COUNT fichiers top-level (seuil: $MAX_FILES, durci 2026-05-09). Anti-drift actif (cf. lessons.md §18). Choisir : (a) consolider dans un fichier existant, (b) déplacer vers _archives/, (c) déplacer la doc technique vers manin-porunga/docs/, (d) override avec env JARVIS_MEMORY_GUARD_BYPASS=1."
+  REASON="Memory/ atteindrait $FUTURE_COUNT fichiers top-level (seuil: $MAX_FILES, durci 2026-05-09). Anti-drift actif (cf. lessons.md §18). Choisir : (a) consolider dans un fichier existant, (b) déplacer vers _archives/, (c) déplacer la doc technique vers docs/, (d) override avec env JARVIS_MEMORY_GUARD_BYPASS=1."
   echo "[$(date)] BLOCK: count=$FUTURE_COUNT > $MAX_FILES — $FILE_PATH" >> "$LOG"
   jq -n --arg reason "$REASON" '{decision: "block", reason: $reason}'
   exit 0
@@ -110,7 +141,7 @@ MAX_FILE_SIZE=20480
 if [[ $NEW_SIZE -gt $MAX_FILE_SIZE ]]; then
   KB=$((NEW_SIZE / 1024))
   CAP_KB=$((MAX_FILE_SIZE / 1024))
-  REASON="$BASENAME atteindrait ~${KB} KB (seuil: ${CAP_KB} KB). Probable drift de doc technique dans la mémoire cognitive (cf. lessons.md §18). Choisir : (a) scinder en plusieurs concepts, (b) déplacer vers manin-porunga/docs/ si c'est de la doc système, (c) relever le plafond du hook si croissance par design assumée, (d) override avec env JARVIS_MEMORY_GUARD_BYPASS=1."
+  REASON="$BASENAME atteindrait ~${KB} KB (seuil: ${CAP_KB} KB). Probable drift de doc technique dans la mémoire cognitive (cf. lessons.md §18). Choisir : (a) scinder en plusieurs concepts, (b) déplacer vers docs/ si c'est de la doc système, (c) relever le plafond du hook si croissance par design assumée, (d) override avec env JARVIS_MEMORY_GUARD_BYPASS=1."
   echo "[$(date)] BLOCK: size=${NEW_SIZE}B > ${MAX_FILE_SIZE}B — $FILE_PATH" >> "$LOG"
   jq -n --arg reason "$REASON" '{decision: "block", reason: $reason}'
   exit 0

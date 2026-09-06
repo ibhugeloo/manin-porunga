@@ -1,0 +1,327 @@
+#!/usr/bin/env python3
+"""Projette la doctrine et les skills Porunga dans Google Antigravity CLI (agy).
+
+La source de vérité reste le vault Namek et le dépôt porunga. Le bridge
+génère un bloc géré dans ``~/.gemini/config/GEMINI.md`` (rules globales, cf.
+customization root machine-local documentée par le skill ``agy-customizations``
+bundlé avec Antigravity CLI) et déclare la bibliothèque de skills Porunga via
+une entrée dans ``~/.gemini/config/skills.json``. Tout contenu utilisateur
+placé hors du bloc géré, ou toute autre entrée de skills.json, est préservé.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import sys
+from pathlib import Path
+
+
+BEGIN = "<!-- BEGIN PORUNGA ANTIGRAVITY BRIDGE -->"
+END = "<!-- END PORUNGA ANTIGRAVITY BRIDGE -->"
+MANAGED_RE = re.compile(
+    rf"(?:\n*){re.escape(BEGIN)}.*?{re.escape(END)}(?:\n*)",
+    re.DOTALL,
+)
+
+PREAMBLE = """# Porunga — doctrine globale pour Antigravity CLI (agy)
+
+Ce bloc est une projection en lecture seule du framework Porunga d'Idriss
+Bhugeloo. Il est régénéré par `jarvis-antigravity-bridge`; ne pas l'éditer à
+la main.
+
+## Identité d'exécution
+
+- Tu es **Antigravity CLI (agy), opérant avec la doctrine Porunga/Jarvis**.
+- Applique le rôle, le ton, la mémoire et les procédures de Jarvis décrits
+  ci-dessous. Si Idriss demande quel moteur lui répond, reste transparent :
+  « Antigravity CLI, avec Porunga chargé » — ne prétends pas être Claude Code.
+- Les rules workspace (`.agents/`, `GEMINI.md`/`AGENTS.md` locaux) gardent
+  leur priorité normale sur ce bloc global. La doctrine Porunga complète ces
+  instructions sans les contourner.
+
+## Routage mémoire et skills
+
+- Les quatre sources HOT sont embarquées intégralement plus bas : SOUL,
+  profil, décisions structurantes et workflows opérationnels.
+- Pour découvrir une information du second cerveau, consulter d'abord
+  `~/Documents/Obsidian/Namek/_vault-index.md`, puis lire la note ciblée.
+- Pour un symptôme technique dont le runbook n'est pas évident, lire
+  `~/Documents/Obsidian/Namek/Claude/Memory/auto/_dispatcher.md`.
+- Les skills Porunga sont déclarés globalement via `skills.json` et
+  découverts par activation à la demande (progressive disclosure). Dès
+  qu'une description correspond à la tâche, lire le `SKILL.md` complet avant
+  d'agir.
+- Respecter le tier HOT/WARM/COLD défini dans `agents.md §10`. Charger une
+  source WARM avant de répondre lorsque son déclencheur correspond.
+- Le vault est l'atelier d'édition de la mémoire. Le dépôt
+  `~/src/porunga/` est le canon Git et la
+  source des scripts, docs et exports. Ne jamais éditer `porunga/memory/`
+  ni `porunga/skills/` directement.
+
+## Persistance
+
+- Après une modification de doctrine dans le vault, exécuter
+  `jarvis-antigravity-bridge` pour rafraîchir les prochaines sessions.
+- Le refresh est également branché sur le cycle `memory-sync` existant;
+  aucun nouveau cron n'est créé.
+- Une session déjà ouverte conserve son contexte initial. Tester le bridge
+  dans une **nouvelle** session Antigravity.
+"""
+
+
+def paths() -> tuple[Path, Path, Path]:
+    home = Path.home()
+    vault = Path(
+        os.environ.get(
+            "JARVIS_VAULT", str(home / "Documents" / "Obsidian" / "Namek")
+        )
+    )
+    repo = Path(
+        os.environ.get(
+            "JARVIS_REPO",
+            str(home / "Documents" / "GIT PROD" / "water-seven" / "porunga"),
+        )
+    )
+    antigravity_home = Path(
+        os.environ.get(
+            "JARVIS_ANTIGRAVITY_HOME", str(home / ".gemini" / "config")
+        )
+    )
+    return vault, repo, antigravity_home
+
+
+def source_files(vault: Path) -> list[tuple[str, Path]]:
+    memory = vault / "Claude" / "Memory"
+    return [
+        ("SOUL — identité et règles d'action", memory / "jarvis_soul.md"),
+        ("PROFIL — Idriss Bhugeloo", memory / "profil.md"),
+        ("DÉCISIONS — choix structurants", memory / "decisions.md"),
+        ("AGENTS — workflows opérationnels", memory / "agents.md"),
+    ]
+
+
+def build_block(vault: Path) -> str:
+    sections = [BEGIN, PREAMBLE.rstrip()]
+    for label, path in source_files(vault):
+        if not path.is_file():
+            raise FileNotFoundError(f"source HOT introuvable : {path}")
+        body = path.read_text(encoding="utf-8").strip()
+        sections.extend(
+            [
+                "",
+                f"---\n\n# SOURCE HOT : {label}",
+                f"\nSource : `{path}`\n",
+                body,
+            ]
+        )
+    sections.extend(["", END])
+    return "\n".join(sections).rstrip() + "\n"
+
+
+def merge_managed_block(existing: str, block: str) -> str:
+    has_begin = BEGIN in existing
+    has_end = END in existing
+    if has_begin != has_end:
+        raise ValueError("bloc Porunga incomplet dans GEMINI.md; correction manuelle requise")
+    if has_begin:
+        if len(MANAGED_RE.findall(existing)) != 1:
+            raise ValueError("plusieurs blocs Porunga détectés dans GEMINI.md")
+        preserved = MANAGED_RE.sub("\n", existing).strip()
+    else:
+        preserved = existing.strip()
+    return block if not preserved else f"{block}\n{preserved}\n"
+
+
+def atomic_write(path: Path, content: str) -> bool:
+    if path.is_file() and path.read_text(encoding="utf-8") == content:
+        return False
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.porunga-tmp-{os.getpid()}")
+    tmp.write_text(content, encoding="utf-8")
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, path)
+    return True
+
+
+def read_skills_json(skills_json_path: Path) -> dict:
+    if not skills_json_path.is_file():
+        return {}
+    raw = skills_json_path.read_text(encoding="utf-8").strip()
+    if not raw:
+        return {}
+    data = json.loads(raw)
+    if not isinstance(data, dict):
+        raise ValueError(f"skills.json invalide (racine non-objet) : {skills_json_path}")
+    return data
+
+
+def dump_skills_json(data: dict) -> str:
+    return json.dumps(data, ensure_ascii=False, indent=2) + "\n"
+
+
+def merge_skills_entry(data: dict, skills_src: Path) -> dict:
+    if not skills_src.is_dir():
+        raise FileNotFoundError(f"bibliothèque skills introuvable : {skills_src}")
+    target = str(skills_src)
+    entries = []
+    for entry in data.get("entries", []):
+        if isinstance(entry, dict):
+            p = entry.get("path", "")
+            if "water-seven/control-room/skills" in p:
+                continue
+            if p == target:
+                continue
+            entries.append(entry)
+    entries.append({"path": target})
+    merged = dict(data)
+    merged["entries"] = entries
+    return merged
+
+
+def remove_skills_entry(data: dict, skills_src: Path) -> tuple[dict, bool]:
+    target = str(skills_src)
+    entries = list(data.get("entries", []))
+    kept = [
+        e for e in entries
+        if not (isinstance(e, dict) and e.get("path") == target)
+    ]
+    if len(kept) == len(entries):
+        return data, False
+    remaining = dict(data)
+    if kept:
+        remaining["entries"] = kept
+    else:
+        remaining.pop("entries", None)
+    return remaining, True
+
+
+def has_skills_entry(data: dict, skills_src: Path) -> bool:
+    target = str(skills_src)
+    return any(
+        isinstance(e, dict) and e.get("path") == target
+        for e in data.get("entries", [])
+    )
+
+
+def check(vault: Path, repo: Path, antigravity_home: Path) -> dict[str, object]:
+    rules_path = antigravity_home / "GEMINI.md"
+    skills_json_path = antigravity_home / "skills.json"
+    skills_src = repo / "skills"
+
+    expected_block = build_block(vault)
+    rules_ok = rules_path.is_file() and expected_block in rules_path.read_text(
+        encoding="utf-8"
+    )
+    try:
+        skills_data = read_skills_json(skills_json_path)
+        skills_ok = has_skills_entry(skills_data, skills_src) and skills_src.is_dir()
+    except (ValueError, json.JSONDecodeError):
+        skills_ok = False
+
+    return {
+        "ok": rules_ok and skills_ok,
+        "rules_ok": rules_ok,
+        "skills_ok": skills_ok,
+        "rules_path": str(rules_path),
+        "skills_json_path": str(skills_json_path),
+    }
+
+
+def uninstall(repo: Path, antigravity_home: Path) -> dict[str, bool]:
+    rules_path = antigravity_home / "GEMINI.md"
+    rules_changed = False
+    if rules_path.is_file():
+        existing = rules_path.read_text(encoding="utf-8")
+        if BEGIN in existing or END in existing:
+            if (BEGIN in existing) != (END in existing):
+                raise ValueError("bloc Porunga incomplet dans GEMINI.md")
+            remaining = MANAGED_RE.sub("\n", existing).strip()
+            if remaining:
+                atomic_write(rules_path, remaining + "\n")
+            else:
+                rules_path.unlink()
+            rules_changed = True
+
+    skills_json_path = antigravity_home / "skills.json"
+    skills_removed = False
+    if skills_json_path.is_file():
+        data = read_skills_json(skills_json_path)
+        remaining, skills_removed = remove_skills_entry(data, repo / "skills")
+        if skills_removed:
+            if remaining:
+                atomic_write(skills_json_path, dump_skills_json(remaining))
+            else:
+                skills_json_path.unlink()
+
+    return {"rules_changed": rules_changed, "skills_removed": skills_removed}
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--check", action="store_true", help="vérifie sans modifier")
+    parser.add_argument(
+        "--uninstall", action="store_true", help="retire uniquement le bridge géré"
+    )
+    parser.add_argument("--json", action="store_true", help="sortie JSON")
+    args = parser.parse_args()
+
+    vault, repo, antigravity_home = paths()
+    try:
+        if args.uninstall:
+            result = uninstall(repo, antigravity_home)
+            ok = True
+        elif args.check:
+            result = check(vault, repo, antigravity_home)
+            ok = bool(result["ok"])
+        else:
+            rules_path = antigravity_home / "GEMINI.md"
+            existing = rules_path.read_text(encoding="utf-8") if rules_path.is_file() else ""
+            rules_changed = atomic_write(
+                rules_path, merge_managed_block(existing, build_block(vault))
+            )
+
+            skills_json_path = antigravity_home / "skills.json"
+            skills_data = read_skills_json(skills_json_path)
+            merged = merge_skills_entry(skills_data, repo / "skills")
+            skills_changed = atomic_write(skills_json_path, dump_skills_json(merged))
+
+            result = {
+                "ok": True,
+                "rules_changed": rules_changed,
+                "rules_path": str(rules_path),
+                "skills_changed": skills_changed,
+                "skills_json_path": str(skills_json_path),
+            }
+            ok = True
+    except (OSError, RuntimeError, ValueError, json.JSONDecodeError) as exc:
+        result = {"ok": False, "error": str(exc)}
+        ok = False
+
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    elif ok:
+        if args.check:
+            print("✅ Bridge Porunga valide : GEMINI.md + skills.json à jour")
+        elif args.uninstall:
+            print(
+                "✅ Bridge Porunga retiré : "
+                f"GEMINI.md={result['rules_changed']}, "
+                f"skills.json={result['skills_removed']}"
+            )
+        else:
+            rules_state = "mise à jour" if result["rules_changed"] else "inchangée"
+            skills_state = "mise à jour" if result["skills_changed"] else "inchangée"
+            print(
+                f"✅ Porunga → Antigravity CLI : doctrine {rules_state}, "
+                f"skills.json {skills_state}"
+            )
+    else:
+        print(f"❌ Bridge Porunga invalide : {result}", file=sys.stderr)
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

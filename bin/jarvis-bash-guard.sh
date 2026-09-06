@@ -17,7 +17,7 @@
 #
 # Référence : decisions.md "anti-bluff git", lessons.md §13/14/15
 # Note : ce script est volontairement défensif. Si quoi que ce soit foire,
-# il LAISSE PASSER (exit 0) plutôt que de bloquer le workflow du boss.
+# il LAISSE PASSER (exit 0) plutôt que de bloquer le workflow d'Idriss.
 
 set +e  # ne PAS sortir sur erreur — on veut être tolérant aux pannes du guard
 
@@ -34,7 +34,10 @@ fi
 
 # --- Extraire la commande Bash ---
 # Format Claude Code : { "tool_input": { "command": "..." } }
-CMD=$(printf '%s' "$PAYLOAD" | python3 -c "
+if command -v jq >/dev/null 2>&1; then
+  CMD=$(printf '%s' "$PAYLOAD" | jq -r '.tool_input.command // empty' 2>/dev/null)
+else
+  CMD=$(printf '%s' "$PAYLOAD" | python3 -c "
 import sys, json
 try:
     data = json.load(sys.stdin)
@@ -42,6 +45,7 @@ try:
 except Exception:
     pass
 " 2>/dev/null)
+fi
 
 if [[ -z "$CMD" ]]; then
   exit 0  # pas de commande extractible, laisser passer
@@ -53,7 +57,7 @@ fi
 # hallucinés, commit sous message mensonger. Voir lessons.md #24.
 # Règle : opérations d'état = UNE commande, puis vérification isolée. Jamais
 # deux verbes mutants chaînés dans la même commande Bash.
-# Verbes mutants d'état (liste validée par le boss) : commit, push, merge,
+# Verbes mutants d'état (liste validée par Idriss) : commit, push, merge,
 # rebase, reset, gh pr create, gh pr merge. `gh pr create` compte car le
 # danger réel = chaîner create+merge sans vérifier la base (incident 2026-05-30).
 MUTATING_COUNT=$(printf '%s' "$CMD" | grep -oE '(git[[:space:]]+(commit|push|merge|rebase|reset)|gh[[:space:]]+pr[[:space:]]+(create|merge))' 2>/dev/null | wc -l | tr -d '[:space:]')
@@ -92,7 +96,10 @@ fi
 # --- Pour les commandes destructives : vérifier qu'un état a été lu ---
 # On lit le transcript Claude Code de la session courante pour voir si un
 # git status / git log / git diff a été exécuté dans les 50 derniers tool calls.
-TRANSCRIPT_PATH=$(printf '%s' "$PAYLOAD" | python3 -c "
+if command -v jq >/dev/null 2>&1; then
+  TRANSCRIPT_PATH=$(printf '%s' "$PAYLOAD" | jq -r '.transcript_path // empty' 2>/dev/null)
+else
+  TRANSCRIPT_PATH=$(printf '%s' "$PAYLOAD" | python3 -c "
 import sys, json
 try:
     data = json.load(sys.stdin)
@@ -100,6 +107,7 @@ try:
 except Exception:
     pass
 " 2>/dev/null)
+fi
 
 # Si pas de transcript accessible → on bloque par sécurité (mode strict)
 if [[ -z "$TRANSCRIPT_PATH" || ! -f "$TRANSCRIPT_PATH" ]]; then
