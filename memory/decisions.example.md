@@ -1,36 +1,50 @@
-# Décisions structurantes
+# Décisions structurantes — invariants actifs
 
-> **Template.** Copiez en `decisions.md`. C'est le **journal des choix tranchés et datés** :
+> **Template.** Copiez en `decisions.md`. C'est le **journal des choix tranchés et des invariants** :
 > la source de vérité quand une nouvelle idée risque de contredire un choix passé.
-> Auto-chargé → garder **dense** (Décision + Pourquoi en 3-5 lignes). Le détail long va ailleurs.
+> Auto-chargé dans le tier HOT → garder **dense** (Décision + Pourquoi en 3-5 lignes).
+> Les détails longs et l'historique archivé vont dans des fichiers annexes non auto-chargés.
 
-**Règles :**
-- Une décision révisée ? **Garder l'ancienne entrée**, ajouter une nouvelle datée. Jamais réécrire l'historique.
-- Plus récent en haut.
-- Si ce fichier grossit trop (auto-load coûteux) : archiver les vieilles entrées dans
-  `decisions-archive.md` (non auto-chargé) et le détail long dans `decisions-detail.md`.
-
----
-
-## AAAA-MM-JJ — <Titre court de la décision>
-
-**Décision** : <ce qui a été tranché, concrètement. 2-3 phrases.>
-
-**Pourquoi** : <la raison profonde, les contraintes, ce que ça remplace. 2-3 phrases.
-Mentionner l'alternative écartée si elle risque de revenir sur le tapis.>
+**Règles de tenue du registre :**
+- Une décision révisée ? **Garder l'historique**, ajouter une nouvelle entrée datée. Jamais réécrire le passé.
+- Invariants permanents en tête ; historique chronologique en dessous.
 
 ---
 
-## AAAA-MM-JJ — <Exemple : Déploiement front sur la plateforme X>
+## Invariants permanents actifs
 
-**Décision** : les fronts en prod vont sur `<plateforme>` ; l'environnement de dev/staging
-reste sur `<infra interne>`. Les bases critiques sur `<service géré>`.
-
-**Pourquoi** : la prod doit tenir un SLA que l'infra interne ne garantit pas ; séparer rend
-explicite l'engagement de service. Alternative écartée : tout self-héberger (trop de risque
-pour du client qui paie).
+- **Gel architectural & Allègement** : aucun nouvel organe (scripts binaires, daemons, cron jobs)
+  sans mandat explicite daté. Maintenance, allègement et purges de complexité autorisés.
+- **Topologie de flotte** : machine de dev = interactif, dev, watchdog mécanique ; serveur / homelab
+  = routines de fond autonomes (briefs, surveillance prod).
+- **Sécurité prod client** : jamais de DELETE programmatique en prod client (API/SQL). Toute suppression
+  critique passe par une interface d'administration avec audit log natif. Sauvegardes obligatoires.
+- **Modèle de coûts & Déterminisme** : déterministe (`bash`, `python`, `jq`, `grep`) en priorité absolue ;
+  LLM réservé au jugement, à l'extraction complexe et à la synthèse. Prompt caching préservé, pas de retry aveugle.
+- **Avis tiers (§15)** : arbitrage d'architecture structurant ou action irréversible = contradiction obligatoire
+  d'une famille de modèles différente (profondeur 1).
+- **Livraison notable (§17)** : hypothèses validées avant code, slices verticales avec preuve E2E observable,
+  revue indépendante en contexte neuf.
 
 ---
 
-> **Astuce :** écrivez une décision **au moment où vous la prenez**, pas après. Le coût
-> (3 lignes) est dérisoire face au coût de re-débattre un choix oublié trois mois plus tard.
+## AAAA-MM-JJ — <Exemple : Pivot vers la recherche déterministe (allègement)>
+
+**Décision** : retrait de la stack vectorielle lourde (`sqlite-vec` + PyTorch local) en production
+au profit d'un index Markdown hiérarchique (`_vault-index.md`), d'un routeur de symptômes (`_dispatcher.md`)
+et de `ripgrep`.
+
+**Pourquoi** : pour une base documentaire personnelle (<10 000 notes structurées), la recherche
+lexicale ciblée est 50x plus rapide (<10 ms vs 10 s de chargement PyTorch/modèle), a zéro dépendance
+externe (aucun risque de cassure venv/pip) et 100% de déterminisme. Le showcase RAG reste conservé
+comme laboratoire éducatif isolé, mais la production privilégie la fiabilité brute.
+
+---
+
+## AAAA-MM-JJ — <Exemple : Séparation des rôles et diversité des modèles>
+
+**Décision** : le rôle de bâtisseur (Jarvis) tourne sur Claude Code et Antigravity CLI ; le rôle de
+contradicteur (Leo) tourne sur un modèle open-weights indépendant (Hermes) hébergé séparément.
+
+**Pourquoi** : deux agents basés sur la même famille de modèles partagent les mêmes angles morts
+et biais de complaisance. Séparer les familles garantit une véritable contradiction.
