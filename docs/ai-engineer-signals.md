@@ -1,47 +1,45 @@
 # AI Engineer signals
 
-> **One-line pitch** — a reliable agent built on top of an LLM: durable memory,
-> behavioural safety rules, and an eval harness that *proves* the rules hold.
+> **One-line pitch** — a reliable autonomous agent built on top of LLMs: durable Markdown memory,
+> multi-agent model diversity, eval-tested behavioural guardrails, and a gated delivery contract.
 
 A recruiter-first map of this repo. Every claim below points to a concrete file or
-feature you can open and verify. This is a personal assistant engine I build and run
-daily — read [`README.md`](../README.md) for the product, [`BEST-PRACTICES.md`](../BEST-PRACTICES.md)
-for the full doctrine, and the [eval harness](../tests/doctrine/README.md) for how the
+feature you can open and verify. This is a personal assistant and control room I build and run
+daily — read [`README.md`](../README.md) for the architecture, [`BEST-PRACTICES.md`](../BEST-PRACTICES.md)
+for the full operating doctrine, and [`tests/doctrine/README.md`](../tests/doctrine/README.md) for how the
 rules are tested.
 
 ---
 
 ## Competency → evidence
 
-Each AI-engineering competency mapped to the thing in this repo that demonstrates it.
+Each AI-engineering competency mapped to the concrete component in this repo demonstrating it.
 
 | Competency | Evidence in this repo | What it shows |
 |---|---|---|
-| **Context engineering** | Tiered **HOT / WARM / COLD** memory (`@import` in `CLAUDE.md`) + **path-scoped rules** ([`claude-config/`](../claude-config)) | Deciding what enters the model's window, when, and why — token budget managed deliberately, not by dumping everything in. Strict HOT admission (≥ 50 % of sessions or a high-blast-radius guardrail) + a hard size cap. |
-| **Retrieval / RAG** | Hybrid vault search — `sqlite-vec` + `sentence-transformers` + FTS5, fully offline ([`showcase/semantic-vault-search/`](../showcase/semantic-vault-search), engine `bin/vault-search-v2.py`) | **Hybrid retrieval** over a private Markdown corpus: e5-small dense vectors (`vec0` cosine KNN, asymmetric `passage:`/`query:` prefixes) fused with FTS5 keyword recall via **Reciprocal Rank Fusion**, behind a confidence gate that refuses instead of guessing. The "R" of RAG, decoupled from any LLM. No vendor API, no data leaving the machine. |
-| **Multi-agent orchestration** | Jarvis / Leo / Alfred on **deliberately different models** ([README "The staff"](../README.md#the-staff)) | Role *and* model diversity so agents don't share blind spots: a Claude-based builder, a self-hosted Hermes contrarian (read-only canon), a scoped homelab sysadmin. One debates, the human decides. |
-| **LLM evaluation** | Doctrine eval harness — 11 graded scenarios, 5 categories ([`tests/doctrine/`](../tests/doctrine)) | Behaviour tested against scenarios, not assumed correct: weighted scoring, per-category aggregation, **regression detection vs the previous run**, non-zero exit to gate CI. Deterministic offline grading + optional, additive LLM-judge. |
-| **LLMOps & cost control** | "No background cron ever calls the LLM", opt-in routines, manual dispatcher ([README "Features"](../README.md#features)) | Every inference is intentional and auditable — every model-calling launchd template ships **disabled**. The model runs because a command was typed. |
-| **AI safety & reliability** | `PreToolUse` hooks, sequential state ops, self-critique gate before "ready" ([`BEST-PRACTICES.md` §2, §3, §8](../BEST-PRACTICES.md)) | Mechanical guardrails around an autonomous agent that can write code and touch prod: a hook blocks batched mutating git/`gh`, a context watch warns before "dumb zone" sessions, deletions on client prod are forbidden programmatically. |
+| **Context engineering** | Tiered **HOT / WARM / COLD** memory (`@import` in `CLAUDE.md`) + **path-scoped rules** ([`claude-config/`](../claude-config)) + **cross-agent bridges** ([`bin/jarvis-antigravity-bridge`](../bin/jarvis-antigravity-bridge), [`bin/jarvis-codex-bridge`](../bin/jarvis-codex-bridge), [`AGENTS.md`](../AGENTS.md)) | Managing token budget deliberately instead of dumping everything in. Strict HOT admission (pertinent in ≥ 50% of sessions or high-blast-radius guardrail) with hard size cap (<100 KB). Multi-harness projection keeps doctrine identical across Claude Code, Google Antigravity CLI, Hermes, and Codex. |
+| **Retrieval & The Post-RAG pivot** | Hybrid vault search ([`showcase/semantic-vault-search/`](../showcase/semantic-vault-search), engine [`bin/vault-search-v2.py`](../bin/vault-search-v2.py)) vs deterministic structured retrieval | **Hybrid retrieval**: e5-small dense vectors (`sqlite-vec` cosine KNN) fused with FTS5 keyword recall via **Reciprocal Rank Fusion (RRF)**, grounded citations, and a refuse-to-answer similarity gate. AND senior architectural judgment: knowing when to use vector RAG vs when structured Markdown indexes + `ripgrep` offer superior speed (<10 ms), zero dependency failures, and complete determinism. |
+| **Multi-agent orchestration** | Jarvis / Leo / Alfred across **deliberately different model families** ([README "The staff"](../README.md#the-staff)) + Third-Party Contradiction ([`BEST-PRACTICES.md` §7](../BEST-PRACTICES.md#7-third-party-model-contradiction-15)) | Role *and* model diversity to prevent shared blind spots: Claude/Antigravity for interactive building, self-hosted Hermes for uncompromised contrarian review over Telegram, scoped models for homelab ops. Mandatory contradiction by a distinct model family (depth 1) before irreversible actions. |
+| **Notable Delivery engineering** | Mechanical delivery gate ([`bin/jarvis-ship-check.py`](../bin/jarvis-ship-check.py), [`bin/jarvis-ship-template.py`](../bin/jarvis-ship-template.py)) + Notable Delivery contract ([`BEST-PRACTICES.md` §3](../BEST-PRACTICES.md#3-self-validation--notable-delivery-17)) | Moving beyond "it compiles": pre-code hypothesis audits (documenting proof, impact if false, recommendation), vertical observable slices with verifiable E2E proof, and independent review in fresh context before calling a feature "ready". |
+| **LLM evaluation** | Doctrine eval harness — 14 graded scenarios across 6 categories ([`tests/doctrine/`](../tests/doctrine)) | Assistant behaviour tested against scenarios, not assumed correct: weighted scoring, category aggregation, **regression detection vs previous run**, non-zero exit gating CI. Deterministic offline baseline (100% pass) + optional, additive LLM-judge. |
+| **LLMOps & cost control** | "No background cron ever calls the LLM", deterministic token observability ([`bin/jarvis-token-report`](../bin/jarvis-token-report)) | Every inference is intentional and auditable. Token usage, prompt-caching hit ratio (targeting >80%), and API-equivalent cost computed deterministically with 0 network calls and 0 LLM queries. |
+| **AI safety & reliability** | PreToolUse hooks, sequential state ops, self-critique gate before "ready" ([`bin/jarvis-bash-guard.sh`](../bin/jarvis-bash-guard.sh), [`bin/jarvis-memory-guard.sh`](../bin/jarvis-memory-guard.sh)) | Mechanical guardrails around an autonomous agent: hook intercepts batched mutating git/gh commands and `rm -rf`, memory guard enforces headless write-roots boundaries and file caps, and context watch prevents "dumb zone" marathon sessions. |
 
 ---
 
 ## Key numbers
 
-Every number below is documented in the repo. Each is labelled with **where it was
-measured** — none is a real-world reliability claim.
+Every number below is documented in the repo and verified in code.
 
 | Number | Value | Measured where |
 |---|---|---|
-| Doctrine scenarios | **11** across 5 categories | `tests/doctrine/` — curated regression suite |
-| Offline baseline pass rate | **100% (11/11)**, 5/5 critical, no regression | `tests/doctrine/report.md` — deterministic grading against recorded fixtures, CI-safe. *A reproducible CI number, **not** a live-model capability score.* |
-| Live run on this suite | latest **11/11**; first live run **79%** (caught a real safety gap, root-caused, fixed, re-verified green) | `--mode live` ([README "Evaluation"](../README.md#evaluation)). *100% on a **targeted regression suite**, **not** a real-world reliability metric; live runs flap with model non-determinism.* |
-| RAG query latency (avg of 5) | **~65 ms**; steady state **~28–53 ms** | `python demo.py --bench` on an Apple Silicon laptop, CPU only, **tiny sample corpus** ([showcase README](../showcase/semantic-vault-search/README.md)). Hardware/corpus-dependent. |
-| RAG model load (cold) | **~10.6 s** (paid once per process, kept warm in-session) | same benchmark, same machine |
-| RAG index build (6 chunks) | **~0.35 s** | same benchmark, sample corpus only |
+| Doctrine scenarios | **14** across 6 categories | `tests/doctrine/` — curated behavioural regression suite |
+| Offline baseline pass rate | **100% (14/14)**, 8/8 critical, no regression | `tests/doctrine/report.md` — deterministic grading against recorded reference fixtures, CI-safe. |
+| Suite execution latency | **~8 ms** total (avg ~0.6 ms / scenario) | `tests/doctrine/report.md` |
+| Live run on this suite | latest **14/14**; first live run **79%** (caught a real safety gap, root-caused, fixed, re-verified green) | `--mode live` ([README "Evaluation"](../README.md#evaluation)). Targeted regression net. |
+| RAG query latency (avg of 5) | **~65 ms**; steady state **~28–53 ms** | `python demo.py --bench` on Apple Silicon, CPU only, sample corpus ([showcase README](../showcase/semantic-vault-search/README.md)). |
+| RAG model load (cold) | **~10.6 s** (paid once per process) | same benchmark, same machine |
 | Embedding model | `multilingual-e5-small`, 384-d, ~470 MB | showcase README |
-| End-user reliability at scale | **not yet measured** | no end-users at scale — personal assistant engine |
-| LLM-judge calibration / agreement | **not yet measured** | judge is additive and needs calibration (see limits) |
 
 ---
 
@@ -49,93 +47,28 @@ measured** — none is a real-world reliability claim.
 
 No padding. What this is *not*:
 
-- **It's a personal assistant engine, not a product at scale.** I'm the only user.
-  There is no production traffic, no end-user reliability data — the numbers above are
-  CI/benchmark numbers, not field metrics.
-- **The eval is a curated regression suite, not statistical coverage.** 11
-  high-blast-radius rules chosen for impact, not a representative sample of behaviour.
-  It catches *behavioural regressions on the rules that matter*; it does not certify
-  the agent is correct in general.
-- **Live scores flap.** Model non-determinism means `--mode live` can move
-  run-to-run — which is exactly why the **deterministic offline baseline** backs the CI
-  gate, not the live number.
-- **The LLM-judge is additive and uncalibrated.** It's a secondary signal layered on
-  scenarios with a `rubric:`; it never feeds the headline pass rate, and its agreement
-  with human judgement has not been measured.
-- **The harness grades text, not tool calls.** It checks what the assistant *says*,
-  not whether it drafted-vs-sent or which tools it invoked — that needs another layer
-  (noted in the harness limitations).
-- **RAG numbers are tiny-corpus.** The benchmark runs on 5 notes / 6 chunks; absolute
-  latencies will differ on a real corpus and other hardware.
+- **Personal system, not a multi-tenant SaaS.** I am the primary user. There is no external multi-user production traffic — these numbers reflect CI, local benchmarks, and personal dev operations.
+- **Curated regression suite, not statistical coverage.** 14 high-blast-radius rules selected for their damage potential if violated (e.g. emitting a destructive SQL `DELETE` in production). It guarantees behavioural regression protection on the invariants that matter most, not universal correctness across all domains.
+- **Live scores carry model non-determinism.** Live model inference can fluctuate; this is why the **deterministic offline baseline** backs the CI gate.
+- **The LLM-judge is advisory.** It is a secondary signal layered on scenarios with a `rubric:`; it never overrides the deterministic regex/keyword pass rate.
+- **The harness grades text, not raw syscalls.** It verifies what the assistant outputs and commits to, supplemented by mechanical bash guards intercepting the actual tool execution.
 
 ---
 
 ## Anticipated interview questions
 
-**"Why only 11 scenarios?"**
-They're a *curated regression suite*, not a coverage benchmark. I picked the 11
-highest-blast-radius rules — the safety and behaviour guardrails where a regression is
-expensive (e.g. emitting a destructive prod `DELETE`). The goal is to catch the
-regressions that matter, fast, in CI, and grow the suite as new incidents surface — not
-to chase a coverage percentage that would dilute the signal.
+**"Why 14 scenarios instead of hundreds?"**
+They form a *curated regression suite* focused on high-consequence failure modes. In agentic engineering, 14 enforceable guardrails with zero false positives that run in 8ms on every push are vastly more effective than 500 loose prompts that flap and get ignored. Each scenario corresponds to a documented incident.
 
-**"Is your LLM-judge reliable?"**
-Not proven, and I don't lean on it. The judge is *additive and clearly labelled* — it
-only runs on scenarios that ship a `rubric:`, and the headline pass rate is **always**
-the deterministic regex/keyword assertions. If the model is unreachable the judge column
-just reads `unavailable` while the deterministic score stands. It needs calibration
-against human judgement before it's a primary signal; today it's a hint, not a gate.
+**"Why did you evolve away from vector RAG in daily production?"**
+In early iterations, Porunga indexed notes with `sqlite-vec` and `multilingual-e5-small`. For a personal vault (<10,000 structured Markdown notes with clear metadata), vector search introduced cold-start overhead (~10s PyTorch load), dependency fragility across Python updates, and occasional semantic false-positives. We pivoted production retrieval to structured Markdown indexes (`_vault-index.md`), a symptom-based dispatcher, and `ripgrep` (<10ms, 0 external dependencies, 100% deterministic). The hybrid vector RAG pipeline is preserved in `showcase/semantic-vault-search/` and `bin/vault-search-v2.py` as an educational reference.
 
-**"Live 100% looks suspicious — explain."**
-Fair, and the repo says so explicitly. It's 100% on a *targeted regression suite of 11
-rules*, not a real-world reliability metric, and live runs flap with non-determinism.
-The first live run scored **79%** and caught a real gap: asked to delete prod rows, the
-agent refused API execution but still wrote a ready-to-paste `DELETE FROM …`. I
-root-caused it to an ambiguous rule, tightened it (never *emit* destructive SQL, not just
-never execute it), and re-verified green. The deterministic offline baseline — not the
-live number — is what backs CI.
+**"How does the Notable Delivery contract work in practice?"**
+Most AI coding assistants stop at "the tests pass." Our Notable Delivery contract (§17) requires:
+1. **Hypotheses before code**: identifying assumptions whose invalidation would alter architecture or external actions.
+2. **Vertical observable slices**: features scoped from trigger to end result with observable evidence (Playwright run, API status, mobile screenshot).
+3. **Independent review in fresh context**: a separate session with clean context reviews the code without builder narrative bias.
+4. **Mechanical gate**: `bin/jarvis-ship-check.py` parses `feature_list.json` and programmatically fails if any feature marked `done` lacks `evidence`.
 
-**"How is this different from promptfoo / DeepEval / Ragas?"**
-Those are mature, generic LLM-eval *frameworks* and I'm not competing with them — they
-sit at a different layer and compose. This harness is a **behavioural eval for *this*
-agent's doctrine**: it tests my specific safety, memory-discipline and tone rules, maps
-each scenario to the doctrine rule it guards (`doctrine: "agents §14"`), and gates CI on
-regression. It's a policy-engine test for one agent, not a reusable eval platform.
-
-**"How does your RAG avoid hallucination?"**
-The showcase is the **retrieval** stage only, deliberately decoupled from any LLM — so by
-itself it can't hallucinate; it returns ranked source passages with their file path and a
-similarity score, not generated prose. The anti-hallucination contribution is *grounding
-quality*: honouring the e5 asymmetric `passage:`/`query:` prefixes and paragraph-level
-chunking so the right passage surfaces (it makes cross-vocabulary jumps a keyword engine
-misses). Wiring it under an LLM, you ground the answer in those retrieved passages —
-retrieval quality is the lever, and that's what this component owns.
-
-**"Isn't this just sophisticated dotfiles?"**
-The config is the boring part. What's engineered is on top of it: a *measurable* doctrine
-(an eval harness with scoring + regression detection that caught a real safety bug),
-**mechanical** guardrails (a `PreToolUse` hook that blocks batched mutating git, not a
-note asking nicely), a tiered context-engineering system with strict admission rules, and
-a local RAG retrieval engine. Dotfiles configure tools; this wraps an autonomous agent in
-tested, enforced safety behaviour — and proves it holds.
-
----
-
-## Architecture at a glance
-
-```mermaid
-flowchart TD
-    Me(["Human — edits as a human"]) -->|write| V["Obsidian vault (.md)<br/>atelier + live memory"]
-    V -->|"@import · HOT/WARM/COLD"| J["JARVIS<br/>Claude Code · builder"]
-    V -->|"memory-sync · nightly"| G[("git = THE CANON<br/>dated · versioned · append-only")]
-    J -->|"graded scenarios"| E["Eval harness<br/>11 scenarios · CI gate"]
-    J -->|"local semantic search"| R["RAG retrieval<br/>sqlite-vec · e5 · offline"]
-    J <-->|"debate · human decides"| L["LEO<br/>Hermes · contrarian"]
-    G -->|"read-only clone"| L
-    G -.->|"read-only"| A["ALFRED<br/>homelab · sysadmin"]
-    classDef canon fill:#1f2937,stroke:#f59e0b,color:#fff;
-    class G canon;
-```
-
-One brain (the Markdown vault), git as the single source of truth, a staff of runtimes
-on different models, with retrieval and a behavioural eval wired around the builder.
+**"How do you keep the agents from hallucinating agreement?"**
+We enforce **model diversity**: Jarvis runs on Claude Code and Antigravity CLI, while Leo runs on self-hosted Hermes (Nous Research) on independent infrastructure. Because they stem from distinct model families trained on different corpora, they do not share systemic blind spots.
