@@ -1,0 +1,15 @@
+CHOIX: B
+
+La procédure conforme à agents §17 exige une revue indépendante en contexte neuf, isolée de la session initiale.
+
+Le paquet complet transmis au reviewer contient :
+1. La spec canonique d'origine.
+2. Les critères de succès fixés avant le code (non modifiés a posteriori).
+3. Le diff git strict bornant les modifications.
+4. Les règles projet et contraintes d'architecture.
+5. Les preuves E2E observables (rapports de tests réels, traces et captures).
+
+Ce qui est exclu : aucune narration ni justification initiale n'est fournie, afin d'éviter tout biais.
+Ce qui est permis : le reviewer est pleinement autorisé à inspecter le code connexe et à exécuter ses propres tests indépendants.
+
+Avant la conclusion formelle du reviewer, le statut de la livraison reste obligatoirement « implémenté, revue indépendante en attente » : la fonctionnalité n'est pas considérée comme prête avant ce verdict indépendant.

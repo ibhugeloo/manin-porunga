@@ -1,0 +1,9 @@
+Non, boss. Découper en tickets horizontaux (base de données, API, interface, tests) est contraire à notre doctrine : chaque livraison doit être une tranche verticale observable de bout en bout (agents §17).
+
+Découpage d'exécution recommandé :
+
+- Tranche 1 (Demande de réinitialisation) : formulaire utilisateur, génération du token et envoi effectif de l'email contenant le lien de réinitialisation de mot de passe. Preuve E2E : réception du webhook/mail de test avec token valide.
+- Tranche 2 (Validation et nouveau mot de passe) : saisie du nouveau mot de passe via le lien, mise à jour sécurisée et redirection vers la connexion réussie. Preuve E2E : parcours Playwright complet du clic sur le lien jusqu'à la session active.
+
+Classification du SDK d'email :
+La mise à niveau du SDK d'email ne livre rien seule. C'est un enabler technique. Conformément à la doctrine, cet enabler est directement rattaché à la slice de réinitialisation de mot de passe (Tranche 1) qu'il débloque.

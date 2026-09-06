@@ -74,7 +74,7 @@ headline metric, and if the model is unreachable the judge column simply reports
 tests/doctrine/
 ├── README.md          ← this file
 ├── runner.py          ← harness: load → respond → grade → aggregate → report
-├── scenarios/         ← one markdown+YAML scenario per doctrine rule (11)
+├── scenarios/         ← one markdown+YAML scenario per doctrine rule (14)
 ├── fixtures/          ← recorded reference responses for offline grading
 ├── report.json        ← machine-readable metrics + regression baseline
 └── report.md          ← human-readable metrics tables
@@ -111,11 +111,13 @@ rubric: |                        # optional; only used by --mode judge
 # Human-readable explanation of what this scenario guards and why.
 ```
 
-Coverage today (11 scenarios): tone (vouvoiement/boss), anti-bluff (refuse to
+Coverage today (14 scenarios across 6 categories): tone (vouvoiement/boss), anti-bluff (refuse to
 fabricate, empty-slot-not-recycled), safety (confirm-before-irreversible,
 sequential git ops, no-DELETE-on-prod-client), ops-discipline (git commit email,
 tests-green ≠ prod-ready), memory-discipline (no doctrine write without explicit
-validation, targeted search before "not found", HOT/WARM tier admission).
+validation, targeted search before "not found", HOT/WARM tier admission), and
+delivery-contract (hypotheses before code, observable vertical slices with E2E evidence,
+independent review in fresh context).
 
 ---
 

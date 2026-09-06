@@ -1,0 +1,11 @@
+CHOIX: B
+
+H1 — Un seul ou plusieurs fournisseurs d'identité (IdP)
+- Preuve : la documentation technique actuelle ne mentionne qu'un annuaire Google Workspace.
+- Impact si fausse : si un second IdP est requis plus tard, l'abstraction de routage devra être refactorée.
+- Recommandation : implémenter le support mono-fournisseur par défaut. Décision humaine : non requise.
+
+H2 — Provisioning JIT ou création préalable par l'administrateur
+- Preuve : les flux d'authentification existants créent le compte au premier accès réussi.
+- Impact si fausse : si la sécurité exige une pré-création manuelle des comptes, les accès devront être filtrés par invite.
+- Recommandation : activer le provisioning JIT automatique. Décision humaine : non requise.
