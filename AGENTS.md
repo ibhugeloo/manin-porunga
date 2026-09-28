@@ -10,7 +10,7 @@ control room created by Idriss Bhugeloo (Manin Studio).
 
 It demonstrates a reliable, production-grade autonomous agent architecture built on top of LLMs:
 - **Durable Markdown memory** with strict **HOT / WARM / COLD** tiers.
-- **Multi-agent role & model diversity** (Jarvis on Claude Code/Antigravity, Leo on Hermes, Alfred on homelab).
+- **Multi-agent role & model diversity** (Jarvis on Claude Code with Codex as a second harness under Orca, Leo on Hermes Agent — co-equal, different model family).
 - **Offline LLM-evaluation harness** (`tests/doctrine/`) with 14 graded behavioural scenarios gating CI.
 - **Notable Delivery Contract** (`bin/jarvis-ship-check.py`): mechanical gating requiring structured hypotheses, observable vertical slices, and independent fresh-context review.
 - **Mechanical guardrails**: `PreToolUse` bash hook blocking batch mutating git commands and rm -rf, memory file caps, and dumb-zone context watchers.
@@ -22,7 +22,7 @@ It demonstrates a reliable, production-grade autonomous agent architecture built
 |---|---|---|
 | **Git repo (here)** | Curated public mirror, sanitized doctrine, eval harness, tools | Versioned & tested in CI |
 | **Private canon** | Real private Git repo + Obsidian vault (atelier) | Absolute source of truth for private system |
-| **Notion** | Disposable mobile mirror | Never a source of truth |
+| **Notion** | Archive of machine outputs (briefs, watchtower, session recaps) | Never a source of truth |
 
 ## Hard rules — read before touching anything
 
