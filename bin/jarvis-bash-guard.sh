@@ -1,149 +1,293 @@
-#!/bin/bash
-# jarvis-bash-guard.sh — PreToolUse hook pour Bash
+#!/usr/bin/env bash
+# jarvis-bash-guard.sh — PreToolUse:Bash. Garde-fou comportemental heuristique.
 #
-# Mission : casser le pattern de bluff git récidivant (lessons #13, #14, #15).
-# Avant toute commande git destructrice / irréversible, force Jarvis à avoir
-# lu l'état réel du repo (git status / git log) dans le tour de tool calls
-# courant. Sinon le hook bloque avec un message explicite.
+# Bloque : les batchs d operations d etat git/gh chainees, et les commandes git
+# destructives (push --force, reset --hard, clean -f, branch -D…). Fail-CLOSED :
+# tout payload vide, malforme ou non verifiable est refuse. Une consultation
+# prealable (git status/log) ne vaut PAS autorisation de detruire.
 #
-# Stratégie :
-#   - Lire le payload JSON envoyé par Claude Code sur stdin
-#   - Extraire la commande Bash
-#   - Si la commande matche le pattern destructif → vérifier qu'un git status
-#     ou git log a été appelé dans la même session récente (transcript)
-#   - Sinon : exit 2 (bloque l'outil) avec stderr lisible
+# Ce n est PAS une sandbox OS et cela ne neutralise pas du code obfusque.
+# Contrat complet, couches et limites connues : docs/garde-fous.md.
 #
-# Bypass d'urgence (utilisateur uniquement) : variable d'env JARVIS_GIT_GUARD_BYPASS=1
-#
-# Référence : decisions.md "anti-bluff git", lessons.md §13/14/15
-# Note : ce script est volontairement défensif. Si quoi que ce soit foire,
-# il LAISSE PASSER (exit 0) plutôt que de bloquer le workflow d'Idriss.
+# BYPASS EXPLICITE (UTILISATEUR UNIQUEMENT) : export JARVIS_GIT_GUARD_BYPASS=1
 
-set +e  # ne PAS sortir sur erreur — on veut être tolérant aux pannes du guard
+set -uo pipefail
 
-# --- Bypass explicite ---
-if [[ "$JARVIS_GIT_GUARD_BYPASS" == "1" ]]; then
+# --- 1. Bypass explicite utilisateur ---
+# Neutralise sous JARVIS_TELEGRAM_WRITE=1 : depuis Telegram, le boss n a pas de
+# terminal pour poser ce bypass, donc un bypass present dans ce contexte ne peut
+# venir que du sous-processus lui-meme. Un agent ne s auto-accorde pas un mandat.
+if [[ "${JARVIS_GIT_GUARD_BYPASS:-0}" == "1" && "${JARVIS_TELEGRAM_WRITE:-0}" != "1" ]]; then
   exit 0
 fi
 
-# --- Lire le payload JSON ---
-PAYLOAD=$(cat 2>/dev/null)
+# --- 2. Lecture du payload JSON (Fail-Closed) ---
+PAYLOAD=$(cat 2>/dev/null || true)
 if [[ -z "$PAYLOAD" ]]; then
-  exit 0  # pas de payload, laisser passer
+  echo "🛑 jarvis-bash-guard: payload JSON manquant sur stdin (fail-closed)" >&2
+  exit 2
 fi
 
-# --- Extraire la commande Bash ---
-# Format Claude Code : { "tool_input": { "command": "..." } }
-if command -v jq >/dev/null 2>&1; then
-  CMD=$(printf '%s' "$PAYLOAD" | jq -r '.tool_input.command // empty' 2>/dev/null)
-else
-  CMD=$(printf '%s' "$PAYLOAD" | python3 -c "
-import sys, json
+# --- 3. Analyse de la commande via Python (stdlib) ---
+ANALYSIS=$(GUARD_PAYLOAD="$PAYLOAD" python3 - <<'PYEOF'
+import sys, json, os, shlex
+
+payload_raw = os.environ.get("GUARD_PAYLOAD", "")
 try:
-    data = json.load(sys.stdin)
-    print(data.get('tool_input', {}).get('command', ''))
-except Exception:
-    pass
-" 2>/dev/null)
+    data = json.loads(payload_raw)
+except Exception as e:
+    print(json.dumps({"error": f"JSON invalide: {e}"}))
+    sys.exit(0)
+
+tool_input = data.get("tool_input") or {}
+cmd = tool_input.get("command")
+if not cmd:
+    print(json.dumps({"error": "tool_input.command manquant"}))
+    sys.exit(0)
+
+def strip_shell_comments(raw):
+    result = []
+    in_single = False
+    in_double = False
+    in_comment = False
+    escape = False
+
+    for i, ch in enumerate(raw):
+        if in_comment:
+            if ch == "\n":
+                in_comment = False
+                result.append("\n")
+            continue
+
+        if escape:
+            result.append(ch)
+            escape = False
+            continue
+
+        if ch == "\\" and not in_single:
+            escape = True
+            result.append(ch)
+            continue
+
+        if ch == "'" and not in_double:
+            in_single = not in_single
+            result.append(ch)
+            continue
+
+        if ch == '"' and not in_single:
+            in_double = not in_double
+            result.append(ch)
+            continue
+
+        if not in_single and not in_double and ch == "#":
+            if i == 0 or raw[i - 1] in " \t\r\n;&|(":
+                in_comment = True
+                continue
+
+        result.append(ch)
+
+    return "".join(result)
+
+# Parsing shell avec préservation stricte des séparateurs après commentaires
+clean_cmd = strip_shell_comments(cmd)
+try:
+    lexer = shlex.shlex(clean_cmd, posix=True, punctuation_chars=True)
+    lexer.whitespace = ' \t\r'  # Conserver \n comme token de séparation
+    lexer.commenters = ''       # Commentaires préalablement nettoyés sans perte de \n
+    raw_tokens = list(lexer)
+except Exception as e:
+    print(json.dumps({"error": f"Syntaxe shell non vérifiable: {e}"}))
+    sys.exit(0)
+
+# Séparateurs de commandes et délimiteurs de blocs conditionnels
+BLOCK_DELIMITERS = {";", "\n", "&&", "||", "|", "&", "(", ")", "then", "else", "elif", "do", "done", "fi", "esac", "{", "}"}
+PREFIXES = {"if", "while", "until", "for", "select", "time", "!", "then", "else", "elif", "do"}
+WRAPPERS = {"env", "time", "sudo", "noglob", "builtin", "command", "exec"}
+
+# Découper en instructions / commandes individuelles
+commands = []
+curr = []
+for tok in raw_tokens:
+    if tok in BLOCK_DELIMITERS:
+        if curr:
+            commands.append(curr)
+            curr = []
+    else:
+        curr.append(tok)
+if curr:
+    commands.append(curr)
+
+mutating_calls = []
+destructive_calls = []
+
+for c in commands:
+    k = 0
+    # Sauter les variables d'environnement en préfixe, mots-clés de contrôle et wrappers
+    while k < len(c):
+        tok = c[k]
+        if "=" in tok and not tok.startswith("-"):
+            k += 1
+        elif tok in PREFIXES or tok in WRAPPERS:
+            k += 1
+        else:
+            break
+
+    if k >= len(c):
+        continue
+
+    tool = c[k]
+    k += 1
+
+    if tool == "git":
+        subcmd = None
+        args = []
+        # Sauter les options globales git
+        while k < len(c):
+            arg = c[k]
+            if arg in ("-C", "-c", "--git-dir", "--work-tree", "--namespace", "--super-prefix"):
+                k += 2
+            elif arg.startswith("-"):
+                k += 1
+            else:
+                subcmd = arg
+                k += 1
+                break
+        args = c[k:]
+
+        if subcmd:
+            # Opération mutante
+            if subcmd in ("commit", "push", "merge", "rebase", "reset"):
+                mutating_calls.append(f"git {subcmd}")
+
+            # Opération destructive
+            is_destr = False
+            # push : force explicite, refspec forcee (+src:dst — le lexer isole
+            # le "+" en token propre), ou suppression/ecrasement de refs distantes.
+            if subcmd == "push" and any(
+                a in ("--force", "-f", "--mirror", "--delete", "-d")
+                or a.startswith("--force-with-lease")
+                or a.startswith("--force-if-includes")
+                or a.startswith("+")
+                for a in args
+            ):
+                is_destr = True
+            elif subcmd == "reset" and "--hard" in args:
+                is_destr = True
+            elif subcmd == "clean" and any(a in ("-f", "--force") or (a.startswith("-") and "f" in a) for a in args):
+                is_destr = True
+            elif subcmd == "branch" and any(a in ("-D",) or ("--delete" in args and "--force" in args) for a in args):
+                is_destr = True
+            elif subcmd in ("checkout", "restore") and ("--" in args or "." in args):
+                is_destr = True
+            elif subcmd == "rebase" and any(a in ("-i", "--interactive") for a in args):
+                is_destr = True
+            elif subcmd == "commit" and "--amend" in args:
+                is_destr = True
+
+            if is_destr:
+                destructive_calls.append(f"git {subcmd} " + " ".join(args))
+
+    elif tool == "gh":
+        gh_args = c[k:]
+        if len(gh_args) >= 2 and gh_args[0] == "pr" and gh_args[1] in ("create", "merge"):
+            mutating_calls.append(f"gh pr {gh_args[1]}")
+
+print(json.dumps({
+    "cmd": cmd,
+    "mutating_count": len(mutating_calls),
+    "mutating_calls": mutating_calls,
+    "destructive_calls": destructive_calls
+}))
+PYEOF
+)
+
+# --- 4. Interprétation du résultat d'analyse (jq : 1 process, pas 5) ---
+# L ancienne version relançait python3 cinq fois sur le meme JSON — l essentiel
+# du cout du hook. jq est deja un prerequis du socle. Fail-closed preserve :
+# un JSON illisible n est pas traite comme "rien a signaler".
+if [[ -z "$ANALYSIS" ]] || ! jq -e . >/dev/null 2>&1 <<< "$ANALYSIS"; then
+  echo "🛑 jarvis-bash-guard: échec de l'analyseur interne (fail-closed)" >&2
+  exit 2
 fi
 
-if [[ -z "$CMD" ]]; then
-  exit 0  # pas de commande extractible, laisser passer
+ERROR_MSG=$(jq -r '.error // ""' <<< "$ANALYSIS")
+if [[ -n "$ERROR_MSG" ]]; then
+  echo "🛑 jarvis-bash-guard: $ERROR_MSG (fail-closed)" >&2
+  exit 2
 fi
 
-# --- GARDE-FOU 1 : batch de commandes git/gh MUTANTES interdites ---
-# Cause : session 2026-05-30 — rafale de commandes git/gh dépendantes (créer PR
-# + merger + commit + push) dans un même flux → résultats désordonnés, états
-# hallucinés, commit sous message mensonger. Voir lessons.md #24.
-# Règle : opérations d'état = UNE commande, puis vérification isolée. Jamais
-# deux verbes mutants chaînés dans la même commande Bash.
-# Verbes mutants d'état (liste validée par Idriss) : commit, push, merge,
-# rebase, reset, gh pr create, gh pr merge. `gh pr create` compte car le
-# danger réel = chaîner create+merge sans vérifier la base (incident 2026-05-30).
-MUTATING_COUNT=$(printf '%s' "$CMD" | grep -oE '(git[[:space:]]+(commit|push|merge|rebase|reset)|gh[[:space:]]+pr[[:space:]]+(create|merge))' 2>/dev/null | wc -l | tr -d '[:space:]')
+MUTATING_COUNT=$(jq -r '.mutating_count // 0' <<< "$ANALYSIS")
+DESTRUCTIVE_COUNT=$(jq -r '(.destructive_calls // []) | length' <<< "$ANALYSIS")
+CMD=$(jq -r '.cmd // ""' <<< "$ANALYSIS")
 
-if [[ -n "$MUTATING_COUNT" && "$MUTATING_COUNT" -ge 2 ]]; then
+# --- 4.bis GARDE-FOU 0 : publication depuis Telegram (mode ecriture distant) ---
+# Sur le canal Telegram, le boss ne voit ni diff ni sortie de commande : il ne peut
+# pas valider un push a l ecran. La publication ne doit donc pas dependre du
+# jugement du modele — elle passe par la commande /push, tapee par le boss.
+if [[ "${JARVIS_TELEGRAM_WRITE:-0}" == "1" ]]; then
+  # On reutilise l analyseur (tokenise, gere `git -C <dir> push`) plutot qu une
+  # regex de surface : les options globales git ne doivent pas servir d evasion.
+  PUBLISH_CALLS=$(jq -r '[(.mutating_calls // [])[] | select(. == "git push" or . == "gh pr create" or . == "gh pr merge")] | join(", ")' <<< "$ANALYSIS")
+  if [[ -n "$PUBLISH_CALLS" ]]; then
+    cat >&2 <<EOF
+🛑 jarvis-bash-guard — GARDE-FOU 0 : publication interdite depuis Telegram.
+
+Commande interceptée : $CMD
+Opération de publication détectée : $PUBLISH_CALLS
+
+Ce canal est mobile : le boss ne peut ni relire un diff ni valider une sortie à
+l'écran. Conformément à jarvis_soul.md §Action et autorité, push, merge et
+release exigent une validation humaine explicite couvrant l'action.
+
+Le commit local reste autorisé (pathspec explicite). Pour publier, demandez au
+boss de taper la commande **/push** dans le fil Telegram — c'est son acte,
+pas le vôtre.
+EOF
+    exit 2
+  fi
+fi
+
+# --- 5. GARDE-FOU 1 : Batch d'opérations d'état mutantes interdit ---
+if [[ "$MUTATING_COUNT" -ge 2 ]]; then
   cat >&2 <<EOF
 🛑 jarvis-bash-guard — GARDE-FOU 1 : batch de commandes git/gh mutantes bloqué.
 
 Commande interceptée : $CMD
 
-Cette commande chaîne $MUTATING_COUNT opérations d'état (commit/push/merge/rebase/
-reset/gh pr merge). C'est INTERDIT : chaque opération change l'état que la
-suivante lit. Les enchaîner produit des états hallucinés (incident 2026-05-30).
+Cette commande chaîne $MUTATING_COUNT opérations d'état mutantes. C'est INTERDIT :
+chaque opération change l'état que la suivante lit. Les enchaîner produit des
+résultats désordonnés et des états hallucinés (incident 2026-05-30, lessons.md #24).
 
 RÈGLE : opérations git/prod = UNE commande à la fois, puis une vérification
 isolée (git status / git log) avant la suivante. Jamais en batch.
 
 Découpe en commandes séparées et vérifie entre chacune.
 
-Bypass (cas légitime, après vérification manuelle) :
+Bypass (cas légitime validé manuellement) :
   export JARVIS_GIT_GUARD_BYPASS=1
-
-Référence : ~/.claude/CLAUDE.md → jarvis_soul.md (git séquentiel), lessons.md #24
 EOF
   exit 2
 fi
 
-# --- Patterns destructifs / irréversibles à intercepter ---
-# Inspiré du § "Executing actions with care" du system prompt Claude Code
-DANGEROUS_PATTERN='git[[:space:]]+(push[[:space:]]+--force|push[[:space:]]+-f|reset[[:space:]]+--hard|checkout[[:space:]]+--[[:space:]]|restore[[:space:]]+--[[:space:]]|clean[[:space:]]+-f|branch[[:space:]]+-D|rebase[[:space:]]+-i|commit[[:space:]]+--amend)'
-
-if ! printf '%s' "$CMD" | grep -qE "$DANGEROUS_PATTERN"; then
-  exit 0  # commande non-destructive, laisser passer
-fi
-
-# --- Pour les commandes destructives : vérifier qu'un état a été lu ---
-# On lit le transcript Claude Code de la session courante pour voir si un
-# git status / git log / git diff a été exécuté dans les 50 derniers tool calls.
-if command -v jq >/dev/null 2>&1; then
-  TRANSCRIPT_PATH=$(printf '%s' "$PAYLOAD" | jq -r '.transcript_path // empty' 2>/dev/null)
-else
-  TRANSCRIPT_PATH=$(printf '%s' "$PAYLOAD" | python3 -c "
-import sys, json
-try:
-    data = json.load(sys.stdin)
-    print(data.get('transcript_path', ''))
-except Exception:
-    pass
-" 2>/dev/null)
-fi
-
-# Si pas de transcript accessible → on bloque par sécurité (mode strict)
-if [[ -z "$TRANSCRIPT_PATH" || ! -f "$TRANSCRIPT_PATH" ]]; then
-  echo "🛑 jarvis-bash-guard: commande git destructive détectée mais transcript indisponible." >&2
-  echo "   Commande : $CMD" >&2
-  echo "   Bypass : export JARVIS_GIT_GUARD_BYPASS=1 puis re-tenter." >&2
-  exit 2
-fi
-
-# Chercher dans le transcript récent un git status/log/diff/branch
-RECENT_STATE_READ=$(tail -n 500 "$TRANSCRIPT_PATH" 2>/dev/null | grep -cE 'git[[:space:]]+(status|log|diff|branch|show|stash[[:space:]]+list)' 2>/dev/null)
-
-if [[ -z "$RECENT_STATE_READ" || "$RECENT_STATE_READ" -lt 1 ]]; then
+# --- 6. GARDE-FOU 2 : Commandes destructives / irréversibles ---
+if [[ "$DESTRUCTIVE_COUNT" -ge 1 ]]; then
+  DESTR_DETAILS=$(jq -r '(.destructive_calls // []) | join(", ")' <<< "$ANALYSIS")
   cat >&2 <<EOF
-🛑 jarvis-bash-guard — pattern anti-bluff git activé.
+🛑 jarvis-bash-guard — GARDE-FOU 2 : commande git destructive bloquée.
 
 Commande interceptée : $CMD
+Opération destructive détectée : $DESTR_DETAILS
 
-Cette commande est destructive ou irréversible (push --force, reset --hard,
-checkout --, restore --, clean -f, branch -D, commit --amend, rebase -i).
+Cette opération est destructive ou irréversible (push --force, reset --hard, clean -f, branch -D, etc.).
+Conformément à jarvis_soul.md §Action et autorité, une opération destructive exige une
+validation humaine explicite couvrant l'action. Une simple lecture préalable de l'état
+(git status ou git log) ne constitue EN AUCUN CAS un consentement pour détruire.
 
-Avant de l'exécuter, tu DOIS avoir lu l'état réel du repo dans ce tour :
-  - git status
-  - git log --oneline -10
-  - git diff (selon contexte)
-
-Pourquoi : leçons cumulatives #13, #14, #15 — pattern récurrent de bluff git.
-Lire l'état force la confrontation à la réalité avant action irréversible.
-
-Pour bypasser (cas légitime, après avoir vérifié manuellement) :
+Pour exécuter cette commande sous mandat explicite du boss :
   export JARVIS_GIT_GUARD_BYPASS=1
-
-Référence : ~/.claude/CLAUDE.md → agents.md, lessons.md §13/14/15
 EOF
   exit 2
 fi
 
-# OK : un git status/log/diff a été lu récemment, on laisse passer
+# Commande légitime autorisée
 exit 0

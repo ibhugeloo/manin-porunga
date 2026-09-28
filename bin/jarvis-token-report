@@ -5,7 +5,7 @@ Parse les transcripts Claude Code (~/.claude/projects/**/*.jsonl), agrège la
 fenêtre 30j et la fenêtre 30j précédente, et rend :
   - tokens par modèle (input / output / cache read / cache write)
   - ratio de cache (part du volume servie par le prompt caching Anthropic)
-  - coût équivalent API (indicatif — Idriss est sur abonnement, c'est du quota)
+  - coût équivalent API (indicatif — le boss est sur abonnement, c'est du quota)
   - delta vs fenêtre précédente + verdict seuillé 🟢/🟡/🔴
 
 Décision 2026-07-29 (mandat /goal cache Porunga, convergence Leo) : pas de
@@ -89,12 +89,29 @@ def supplemental_usage(start, end, codex_dir=None, model_log=None):
                     if not start <= row["timestamp"] < end:
                         continue
                     key = row["engine"] + ":" + row["workflow"]
-                    item = workflows.setdefault(key, dict(attempts=0, failures=0, duration_s=0))
+                    item = workflows.setdefault(key, dict(
+                        attempts=0, calls=0, failures=0, duration_s=0,
+                        prompt_bytes=0, output_bytes=0, approx_tokens_io=0,
+                        exec_success_pct="100%", utilisation="inconnue (sans preuve)"
+                    ))
                     item["attempts"] += 1
-                    item["failures"] += int(row["exit"] != 0)
-                    item["duration_s"] += row["duration_s"]
+                    item["calls"] += 1
+                    is_fail = int(row.get("exit", 0) != 0)
+                    item["failures"] += is_fail
+                    item["duration_s"] += int(row.get("duration_s", 0))
+                    pb = int(row.get("prompt_bytes", 0))
+                    ob = int(row.get("output_bytes", 0))
+                    item["prompt_bytes"] += pb
+                    item["output_bytes"] += ob
+                    item["approx_tokens_io"] += (pb + ob) // 4
+                    item["approx_tokens"] = item["approx_tokens_io"]
                 except (ValueError, TypeError, KeyError):
                     continue
+        for k, v in workflows.items():
+            calls = v["calls"]
+            fails = v["failures"]
+            v["exec_success_pct"] = f"{((calls - fails) / calls * 100):.0f}%" if calls else "0%"
+            v["utilisation"] = "inconnue (sans preuve)"
     return dict(codex_local=dict(status="observed" if sessions else "unavailable",
                                 sessions=len(sessions), **totals),
                 workflows=workflows, hermes_remote="unavailable: remote traces not collected",
@@ -309,6 +326,21 @@ def main():
     print(f"\nTotal : {fmt_m(total_in + out)} tokens, ~${cost:.0f} équiv. API "
           f"(delta {delta_days}j : ~${recent_cost:.0f} vs ~${prev_cost:.0f} précédents)")
     print(check_line)
+
+    wf = coverage.get("workflows") or {}
+    if wf:
+        print("\n## Attribution par workflow")
+        print(f"{'workflow':<24} {'appels':>8} {'échecs':>8} {'durée':>9} {'tokens E/S (~oct/4)':>20} {'succès exec':>13} {'utilisation':>22}")
+        for w_name, w_info in sorted(wf.items()):
+            appels = str(w_info.get("calls", w_info.get("attempts", 0)))
+            echecs = str(w_info.get("failures", 0))
+            duree = f"{w_info.get('duration_s', 0)}s"
+            tok = fmt_m(w_info.get("approx_tokens_io", w_info.get("approx_tokens", 0)))
+            succes = str(w_info.get("exec_success_pct", "—"))
+            util = str(w_info.get("utilisation", "inconnue (sans preuve)"))
+            print(f"{w_name:<24} {appels:>8} {echecs:>8} {duree:>9} {tok:>20} {succes:>13} {util:>22}")
+
+    print("\n## Couverture et télémétrie")
     print(json.dumps(coverage, ensure_ascii=False, indent=2))
 
 

@@ -1,151 +1,76 @@
 #!/bin/zsh
-# jarvis-memory-guard — Hook PreToolUse anti-bloat sur Memory/.
-# Inspiré du PreToolUse de seanchiuai/openclaude (le 50-line cap sur MEMORY.md).
-# Bloque les Write/Edit qui feraient déborder Memory/ au-delà des seuils.
-#
-# Lit l'input JSON Claude Code sur stdin. Sort :
-#   - exit 0 (silent) si OK
-#   - JSON {"decision":"block","reason":"…"} sur stdout sinon (Claude Code surface le message)
-#
-# Bypass : env JARVIS_MEMORY_GUARD_BYPASS=1
-
+# jarvis-memory-guard — Hook PreToolUse anti-bloat sur Memory/ (Write|Edit|MultiEdit).
+# Inspire du PreToolUse de seanchiuai/openclaude (cap 50 lignes sur MEMORY.md).
+# Sort exit 0 silencieux si OK, sinon {"decision":"block","reason":…} sur stdout.
+# Seuils, doctrine anti-drift (lessons.md §18) et perimetre : docs/garde-fous.md.
+# Bypass anti-bloat : JARVIS_MEMORY_GUARD_BYPASS=1 (ne leve PAS la frontiere headless).
 set -uo pipefail
-
 JARVIS_VAULT="${JARVIS_VAULT:-$HOME/Documents/Obsidian/vault}"
 JARVIS_REPO="${JARVIS_REPO:-$HOME/Documents/GIT PROD/manin-porunga}"
-
 LOG="$HOME/.local/var/log/jarvis-memory-guard.log"
-mkdir -p "$(dirname "$LOG")"
-
+mkdir -p "${LOG:h}"
 INPUT=$(cat)
 
-TOOL_NAME=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty')
-FILE_PATH=$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // empty')
+TOOL_NAME=$(print -r -- "$INPUT" | jq -r '.tool_name // empty')
+FILE_PATH=$(print -r -- "$INPUT" | jq -r '.tool_input.file_path // empty')
+[[ "$TOOL_NAME" == (Write|Edit|MultiEdit) ]] || exit 0
 
-# Filtre : on ne s'occupe que de Write/Edit/MultiEdit
-case "$TOOL_NAME" in
-  Write|Edit|MultiEdit) ;;
-  *) exit 0 ;;
-esac
+block() { # block <tag-log> <raison-agent>
+  print -r -- "[$(date)] BLOCK $1 — $FILE_PATH" >> "$LOG"
+  jq -n --arg r "$2" '{decision:"block",reason:$r}'
+  exit 0
+}
 
-# Les processus Claude headless déclarent explicitement les racines où ils
-# peuvent écrire. Cette barrière s'applique AVANT le bypass anti-bloat : un
-# sous-processus non interactif ne doit jamais pouvoir élargir lui-même son
-# périmètre d'écriture.
+# Frontiere headless — AVANT le bypass : un sous-processus non interactif ne doit
+# jamais pouvoir elargir lui-meme son perimetre d ecriture.
 if [[ -n "${JARVIS_HEADLESS_WRITE_ROOTS:-}" ]]; then
   if ! python3 - "$FILE_PATH" "$JARVIS_HEADLESS_WRITE_ROOTS" <<'PY'
-import os
-import pathlib
-import sys
-
+import os, pathlib, sys
 target = pathlib.Path(sys.argv[1]).expanduser().resolve(strict=False)
-roots = [
-    pathlib.Path(raw).expanduser().resolve(strict=False)
-    for raw in sys.argv[2].split(os.pathsep)
-    if raw
-]
-allowed = any(target == root or root in target.parents for root in roots)
-raise SystemExit(0 if allowed else 1)
+roots = [pathlib.Path(r).expanduser().resolve(strict=False) for r in sys.argv[2].split(os.pathsep) if r]
+raise SystemExit(0 if any(target == r or r in target.parents for r in roots) else 1)
 PY
   then
-    REASON="Écriture headless hors périmètre bloquée : $FILE_PATH. Racines autorisées : $JARVIS_HEADLESS_WRITE_ROOTS"
-    echo "[$(date)] BLOCK HEADLESS: $TOOL_NAME $FILE_PATH" >> "$LOG"
-    jq -n --arg reason "$REASON" '{decision: "block", reason: $reason}'
-    exit 0
+    block "HEADLESS" "Écriture headless hors périmètre bloquée : $FILE_PATH. Racines autorisées : $JARVIS_HEADLESS_WRITE_ROOTS"
   fi
 fi
 
-# Bypass explicite de l'anti-bloat uniquement. Il ne désactive pas la frontière
-# headless ci-dessus.
-if [[ "${JARVIS_MEMORY_GUARD_BYPASS:-0}" == "1" ]]; then
-  exit 0
-fi
+[[ "${JARVIS_MEMORY_GUARD_BYPASS:-0}" == "1" ]] && exit 0
 
-# Filtre : doit cibler Memory/ top-level (pas _archives, pas auto, pas observations.md sous-dirs)
+# Cible : uniquement les .md a la RACINE de Memory/ (sous-dossiers _archives/,
+# auto/, proposed/… laisses libres).
 MEMORY_DIR="$JARVIS_VAULT/Claude/Memory"
-case "$FILE_PATH" in
-  "$MEMORY_DIR"/*.md) ;;  # OK, top-level
-  *) exit 0 ;;
-esac
+[[ "$FILE_PATH" == "$MEMORY_DIR"/*.md && "$FILE_PATH" != "$MEMORY_DIR"/*/* ]] || exit 0
+BASENAME="${FILE_PATH:t}"
 
-# Si dans un sous-dossier (_archives/, auto/, proposed/, etc.) → laisser passer
-case "$FILE_PATH" in
-  "$MEMORY_DIR"/*/*) exit 0 ;;
-esac
-
-BASENAME=$(basename "$FILE_PATH")
-
-# Whitelist : fichiers qui peuvent croître par design
-case "$BASENAME" in
-  decisions.md|decisions-detail.md|decisions-archive.md|lessons.md|MEMORY.md|observations.md)
-    # On laisse passer mais on log la croissance pour audit
-    if [[ -f "$FILE_PATH" ]]; then
-      SIZE=$(wc -c < "$FILE_PATH" | tr -d ' ')
-      echo "[$(date)] WHITELIST: $BASENAME (size=${SIZE}B)" >> "$LOG"
-    fi
-    exit 0
-    ;;
-esac
-
-# Compter les fichiers .md top-level actuels
-CURRENT_COUNT=$(find "$MEMORY_DIR" -maxdepth 1 -type f -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
-
-# Pour Write : si le fichier n'existe pas, ça ajoute 1 au count
-NEW_FILE=0
-if [[ "$TOOL_NAME" == "Write" && ! -f "$FILE_PATH" ]]; then
-  NEW_FILE=1
+# Whitelist : fichiers qui croissent par design. Passage libre, mais trace.
+if [[ "$BASENAME" == (decisions.md|decisions-detail.md|decisions-archive.md|lessons.md|MEMORY.md|observations.md) ]]; then
+  [[ -f "$FILE_PATH" ]] && print -r -- "[$(date)] WHITELIST: $BASENAME (size=$(wc -c < "$FILE_PATH" | tr -d ' ')B)" >> "$LOG"
+  exit 0
 fi
 
-FUTURE_COUNT=$((CURRENT_COUNT + NEW_FILE))
-
-# Seuil : 16 fichiers max top-level (on est à 12 + observations.md = 13, marge raisonnable)
+# Seuil 1 — nombre de fichiers .md a la racine (durci 2026-05-09).
 MAX_FILES=14
-if [[ $FUTURE_COUNT -gt $MAX_FILES ]]; then
-  REASON="Memory/ atteindrait $FUTURE_COUNT fichiers top-level (seuil: $MAX_FILES, durci 2026-05-09). Anti-drift actif (cf. lessons.md §18). Choisir : (a) consolider dans un fichier existant, (b) déplacer vers _archives/, (c) déplacer la doc technique vers docs/, (d) override avec env JARVIS_MEMORY_GUARD_BYPASS=1."
-  echo "[$(date)] BLOCK: count=$FUTURE_COUNT > $MAX_FILES — $FILE_PATH" >> "$LOG"
-  jq -n --arg reason "$REASON" '{decision: "block", reason: $reason}'
-  exit 0
-fi
+COUNT=$(find "$MEMORY_DIR" -maxdepth 1 -type f -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
+[[ "$TOOL_NAME" == "Write" && ! -f "$FILE_PATH" ]] && COUNT=$((COUNT + 1))
+(( COUNT > MAX_FILES )) && block "count=$COUNT > $MAX_FILES" \
+  "Memory/ atteindrait $COUNT fichiers top-level (seuil: $MAX_FILES, durci 2026-05-09). Anti-drift actif (cf. lessons.md §18). Choisir : (a) consolider dans un fichier existant, (b) déplacer vers _archives/, (c) déplacer la doc technique vers docs/, (d) override avec env JARVIS_MEMORY_GUARD_BYPASS=1."
 
-# Estimer la taille future du fichier
-CURRENT_SIZE=0
-[[ -f "$FILE_PATH" ]] && CURRENT_SIZE=$(wc -c < "$FILE_PATH" | tr -d ' ')
-
-CONTENT=""
+# Seuil 2 — taille projetee du fichier apres l ecriture.
+CUR=0; [[ -f "$FILE_PATH" ]] && CUR=$(wc -c < "$FILE_PATH" | tr -d ' ')
 case "$TOOL_NAME" in
-  Write)
-    CONTENT=$(printf '%s' "$INPUT" | jq -r '.tool_input.content // empty')
-    NEW_SIZE=$(printf '%s' "$CONTENT" | wc -c | tr -d ' ')
-    ;;
-  Edit)
-    OLD=$(printf '%s' "$INPUT" | jq -r '.tool_input.old_string // empty')
-    NEW=$(printf '%s' "$INPUT" | jq -r '.tool_input.new_string // empty')
-    OLD_LEN=$(printf '%s' "$OLD" | wc -c | tr -d ' ')
-    NEW_LEN=$(printf '%s' "$NEW" | wc -c | tr -d ' ')
-    NEW_SIZE=$((CURRENT_SIZE + NEW_LEN - OLD_LEN))
-    ;;
-  MultiEdit)
-    DELTA=$(printf '%s' "$INPUT" | jq -r '
-      [.tool_input.edits[] |
-       (.new_string | length) - (.old_string | length)]
-      | add // 0
-    ')
-    NEW_SIZE=$((CURRENT_SIZE + DELTA))
-    ;;
+  Write) NEW_SIZE=$(print -rn -- "$(print -r -- "$INPUT" | jq -r '.tool_input.content // empty')" | wc -c | tr -d ' ') ;;
+  Edit)  NEW_SIZE=$(( CUR + $(print -rn -- "$(print -r -- "$INPUT" | jq -r '.tool_input.new_string // empty')" | wc -c | tr -d ' ')
+                          - $(print -rn -- "$(print -r -- "$INPUT" | jq -r '.tool_input.old_string // empty')" | wc -c | tr -d ' ') )) ;;
+  MultiEdit) NEW_SIZE=$(( CUR + $(print -r -- "$INPUT" | jq -r '[.tool_input.edits[] | (.new_string|length) - (.old_string|length)] | add // 0') )) ;;
 esac
 
-# Seuil par fichier : 20 KB hors whitelist (les feedback_* / reference_* opérationnels font 1-7 KB)
-# agents.md : doctrine vivante → plafond doux relevé à 30 KB (Leo 2026-06-04). Au-delà = audit/scission obligatoire, pas de croissance libre.
-MAX_FILE_SIZE=20480
-[[ "$BASENAME" == "agents.md" ]] && MAX_FILE_SIZE=30720
-if [[ $NEW_SIZE -gt $MAX_FILE_SIZE ]]; then
-  KB=$((NEW_SIZE / 1024))
-  CAP_KB=$((MAX_FILE_SIZE / 1024))
-  REASON="$BASENAME atteindrait ~${KB} KB (seuil: ${CAP_KB} KB). Probable drift de doc technique dans la mémoire cognitive (cf. lessons.md §18). Choisir : (a) scinder en plusieurs concepts, (b) déplacer vers docs/ si c'est de la doc système, (c) relever le plafond du hook si croissance par design assumée, (d) override avec env JARVIS_MEMORY_GUARD_BYPASS=1."
-  echo "[$(date)] BLOCK: size=${NEW_SIZE}B > ${MAX_FILE_SIZE}B — $FILE_PATH" >> "$LOG"
-  jq -n --arg reason "$REASON" '{decision: "block", reason: $reason}'
-  exit 0
-fi
+# 20 KB hors whitelist ; agents.md = doctrine vivante, plafond doux 30 KB (Leo
+# 2026-06-04). Au-dela : audit/scission obligatoire, pas de croissance libre.
+MAX_SIZE=20480
+[[ "$BASENAME" == "agents.md" ]] && MAX_SIZE=30720
+(( NEW_SIZE > MAX_SIZE )) && block "size=${NEW_SIZE}B > ${MAX_SIZE}B" \
+  "$BASENAME atteindrait ~$((NEW_SIZE / 1024)) KB (seuil: $((MAX_SIZE / 1024)) KB). Probable drift de doc technique dans la mémoire cognitive (cf. lessons.md §18). Choisir : (a) scinder en plusieurs concepts, (b) déplacer vers docs/ si c'est de la doc système, (c) relever le plafond du hook si croissance par design assumée, (d) override avec env JARVIS_MEMORY_GUARD_BYPASS=1."
 
-echo "[$(date)] OK: $TOOL_NAME $BASENAME (count=$FUTURE_COUNT, size=${NEW_SIZE}B)" >> "$LOG"
+print -r -- "[$(date)] OK: $TOOL_NAME $BASENAME (count=$COUNT, size=${NEW_SIZE}B)" >> "$LOG"
 exit 0

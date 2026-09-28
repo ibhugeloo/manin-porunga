@@ -20,4 +20,4 @@ Chargée quand je touche `Homelab/`, `manin-porunga/`, `workspace/`. Source cano
 - **Accès Coolify** : token dans `~/.config/jarvis/secrets/env`, utilisable seulement depuis le Mac en LAN/Tailscale. Cloud agent ne peut pas.
 - **manin-porunga = source canonique versionnée** (decisions 2026-05-27) : `bin/`/`docs/`/`share/` édités directement ; `memory/` mirroré depuis le vault par `memory-sync` (ne jamais éditer `memory/` dans le repo, il est écrasé).
 - **bootstrap ressuscite ce qui reste en source** (leçon #20) : pour retirer un cron/import, supprimer la SOURCE, pas seulement le déployé.
-- Accès homelab : `ssh -i ~/.ssh/<your-homelab-key> root@<homelab-host>` (ou Tailscale). Pour le sysadmin pur → déléguer à `alfred`.
+- Accès homelab : `ssh -i ~/.ssh/<your-homelab-key> root@<homelab-host>` (IP VLAN routée par Tailscale ; jamais l'IP LAN de la box). Pour le sysadmin pur → déléguer à `alfred`.
