@@ -1,0 +1,236 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Porunga Setup Map</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800&family=IBM+Plex+Sans:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    color-scheme: light;
+    --page: #e8eaed;
+    --card: #ffffff;
+    --ink: #15171a;
+    --muted: #666b74;
+    --line: #2a2d33;
+    --mac: #f6f6f5;
+    --lab: #f2f6f1;
+    --ts: #3b6fd8;
+    --ts-bg: #eef3fe;
+  }
+  body { background: var(--page); color: var(--ink); font-family: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding-inline: 16px; padding-block: 24px; }
+  .frame { background: var(--card); border-radius: 6px; overflow-x: auto; box-shadow: 0 1px 2px rgba(20,24,30,.08), 0 8px 24px rgba(20,24,30,.06); }
+  svg { display: block; width: 100%; min-width: 920px; height: auto; }
+  .h1 { font-family: "Archivo", "Helvetica Neue", Arial, sans-serif; font-weight: 800; font-size: 38px; fill: var(--ink); letter-spacing: -.5px; }
+  .date { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; font-size: 14px; fill: #9aa0a8; }
+  .t { font-weight: 600; font-size: 15.5px; fill: var(--ink); }
+  .t2 { font-weight: 600; font-size: 13px; fill: var(--ink); }
+  .s { font-size: 12px; fill: var(--muted); }
+  .xs { font-size: 11px; fill: var(--muted); }
+  .mono { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; font-size: 10.5px; fill: var(--muted); }
+  .lbl { font-style: italic; font-size: 12px; fill: var(--ink); }
+  .halo { paint-order: stroke; stroke: var(--card); stroke-width: 5px; stroke-linejoin: round; }
+  .halo-ts { paint-order: stroke; stroke: var(--ts-bg); stroke-width: 5px; stroke-linejoin: round; }
+  .hdr { font-family: "Archivo", "Helvetica Neue", Arial, sans-serif; font-weight: 700; font-size: 17px; fill: var(--ink); }
+  .ts { font-family: "Archivo", sans-serif; font-weight: 800; font-size: 14px; letter-spacing: 3px; fill: var(--ts); }
+  .tss { font-size: 11px; fill: var(--ts); }
+  .box { fill: var(--card); stroke: var(--line); stroke-width: 1.3; }
+  .arr { fill: none; stroke: var(--ink); stroke-width: 1.4; }
+  .dash { stroke-dasharray: 4 4; }
+  .note { font-size: 12.5px; color: var(--muted); margin: 12px 4px 0; }
+</style>
+
+<div class="wrap">
+<div class="frame">
+<svg viewBox="0 0 1240 990" role="img" aria-label="Diagram: Mac running Orca, Claude Code and Codex with Porunga, connected over Tailscale to a Proxmox homelab running Leo (Hermes Agent)">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#15171a"/></marker>
+  </defs>
+
+  <!-- Header -->
+  <text class="h1" x="40" y="64">My current setup</text>
+  <text class="date" x="1200" y="52" text-anchor="end">september 2026</text>
+
+  <!-- Me -->
+  <rect class="box" x="470" y="84" width="300" height="76" rx="10"/>
+  <g transform="translate(488,104)" fill="none" stroke="#15171a" stroke-width="1.6" stroke-linecap="round">
+    <rect x="0" y="2" width="13" height="24" rx="3"/><line x1="5" y1="22" x2="8" y2="22"/>
+    <rect x="18" y="4" width="22" height="15" rx="2"/><line x1="29" y1="19" x2="29" y2="24"/><line x1="24" y1="25" x2="34" y2="25"/>
+  </g>
+  <text class="t" x="544" y="116">Me, anywhere</text>
+  <text class="s" x="544" y="136">iPhone · Windows PC</text>
+
+  <path class="arr" d="M500,160 V208" marker-end="url(#a)"/>
+  <text class="lbl" x="490" y="190" text-anchor="end">remote · over Tailscale</text>
+  <text class="lbl" x="945" y="113" text-anchor="middle">Telegram · 24/7</text>
+
+  <!-- ============ MAC ============ -->
+  <rect x="40" y="210" width="610" height="580" rx="14" fill="#f6f6f5" stroke="#2a2d33" stroke-width="1.3"/>
+  <g transform="translate(58,226)" fill="none" stroke="#15171a" stroke-width="1.6" stroke-linejoin="round">
+    <rect x="4" y="2" width="22" height="15" rx="2"/><path d="M0,21 H30 L28,24 H2 Z"/>
+  </g>
+  <text class="hdr" x="98" y="241">MacBook Air</text>
+  <text class="s" x="98" y="259">interactive · dev · watchdog</text>
+
+  <!-- Orca -->
+  <rect class="box" x="75" y="280" width="540" height="66" rx="10"/>
+  <g transform="translate(93,299)" fill="none" stroke="#15171a" stroke-width="1.6">
+    <rect x="0" y="0" width="11" height="11" rx="2"/><rect x="14" y="0" width="11" height="11" rx="2"/>
+    <rect x="0" y="14" width="11" height="11" rx="2"/><rect x="14" y="14" width="11" height="11" rx="2" fill="#15171a"/>
+  </g>
+  <text class="t" x="134" y="308">Orca</text>
+  <text class="s" x="134" y="328">worktrees · terminals · multi-agent orchestration</text>
+
+  <path class="arr" d="M345,346 V370 H190 V398" marker-end="url(#a)"/>
+  <path class="arr" d="M345,370 H500 V398" marker-end="url(#a)"/>
+  <text class="lbl" x="200" y="389">spawns</text>
+  <text class="lbl" x="510" y="389">spawns</text>
+
+  <!-- Codex -->
+  <rect class="box" x="75" y="400" width="230" height="90" rx="10"/>
+  <g transform="translate(92,414)" fill="none" stroke="#15171a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="0" y="0" width="26" height="22" rx="4"/><path d="M6,8 L10,11 L6,14"/><line x1="13" y1="15" x2="19" y2="15"/>
+  </g>
+  <text class="t" x="128" y="430">Codex</text>
+  <text class="s" x="92" y="455">Porunga doctrine loaded</text>
+  <text class="s" x="92" y="473">same memory · same skills</text>
+
+  <!-- Claude Code -->
+  <rect class="box" x="385" y="400" width="230" height="90" rx="10"/>
+  <g transform="translate(415,425)" stroke="#d97757" stroke-width="2.6" stroke-linecap="round">
+    <line x1="0" y1="-11" x2="0" y2="11"/><line x1="-11" y1="0" x2="11" y2="0"/>
+    <line x1="-8" y1="-8" x2="8" y2="8"/><line x1="-8" y1="8" x2="8" y2="-8"/>
+  </g>
+  <text class="t" x="438" y="430">Claude Code · Jarvis</text>
+  <text class="s" x="402" y="455">Opus 5.5 · hooks · MCP</text>
+  <text class="s" x="402" y="473">sub-agents on demand</text>
+
+  <!-- Codex <-> Porunga -->
+  <path class="arr dash" d="M190,492 V558" marker-start="url(#a)" marker-end="url(#a)"/>
+  <text class="lbl" x="200" y="522">codex-bridge</text>
+  <text class="mono" x="200" y="538">AGENTS.md + skills</text>
+  <!-- Claude <-> Vault -->
+  <path class="arr dash" d="M500,492 V558" marker-start="url(#a)" marker-end="url(#a)"/>
+  <text class="lbl" x="510" y="522">reads &amp; writes</text>
+  <text class="mono" x="510" y="538">HOT / WARM memory</text>
+
+  <!-- Porunga -->
+  <rect class="box" x="75" y="560" width="230" height="90" rx="10"/>
+  <g transform="translate(92,574)" fill="none" stroke="#15171a" stroke-width="1.6">
+    <circle cx="5" cy="4" r="3.2"/><circle cx="5" cy="20" r="3.2"/><circle cx="19" cy="8" r="3.2"/>
+    <path d="M5,7.2 V16.8 M19,11.2 C19,16 5,13 5,16.8"/>
+  </g>
+  <text class="t" x="128" y="590">Porunga repo</text>
+  <text class="s" x="92" y="615">scripts · hooks · skills</text>
+  <text class="s" x="92" y="633">canonical git · bootstrap</text>
+
+  <!-- Vault -->
+  <rect class="box" x="385" y="560" width="230" height="90" rx="10"/>
+  <g transform="translate(401,572)">
+    <path d="M12,0 L23,8 L19,25 L5,25 L1,8 Z" fill="#7c5cff"/>
+    <path d="M12,0 L8,13 L5,25 M12,0 L16,13 L19,25 M1,8 L8,13 L16,13 L23,8" fill="none" stroke="#b8a6ff" stroke-width="1"/>
+  </g>
+  <text class="t" x="432" y="590">Obsidian vault</text>
+  <text class="s" x="402" y="615">notes · projects · doctrine</text>
+  <text class="s" x="402" y="633">the single place I think</text>
+
+  <!-- Vault -> Porunga -->
+  <path class="arr" d="M383,605 H308" marker-end="url(#a)"/>
+  <text class="xs" x="345" y="596" text-anchor="middle">memory-sync</text>
+  <text class="mono" x="345" y="622" text-anchor="middle">23:30</text>
+
+  <!-- launchd -->
+  <rect class="box" x="75" y="690" width="540" height="66" rx="10"/>
+  <g transform="translate(92,710)" fill="none" stroke="#15171a" stroke-width="1.6" stroke-linecap="round">
+    <circle cx="12" cy="12" r="11"/><path d="M12,5 V12 L17,15"/>
+  </g>
+  <text class="t" x="128" y="718">Scheduled on the Mac</text>
+  <text class="s" x="128" y="738">watchdog · vault-index 07:30 · leo-sync 23:00 · memory-sync 23:30</text>
+
+  <!-- ============ TAILSCALE ============ -->
+  <rect x="680" y="210" width="100" height="660" rx="50" fill="#eef3fe" stroke="#3b6fd8" stroke-width="1.4" stroke-dasharray="6 5"/>
+  <text class="ts" transform="translate(726,310) rotate(-90)" text-anchor="middle">TAILSCALE</text>
+  <text class="tss" transform="translate(746,310) rotate(-90)" text-anchor="middle">WireGuard mesh · zero-trust</text>
+  <text class="tss" transform="translate(736,760) rotate(-90)" text-anchor="middle">subnet router in the lab</text>
+
+  <!-- ============ HOMELAB ============ -->
+  <rect x="810" y="210" width="390" height="660" rx="14" fill="#f2f6f1" stroke="#2a2d33" stroke-width="1.3"/>
+  <g transform="translate(828,225)" fill="none" stroke="#15171a" stroke-width="1.6">
+    <rect x="0" y="0" width="26" height="9" rx="2"/><rect x="0" y="12" width="26" height="9" rx="2"/>
+    <circle cx="21" cy="4.5" r="1" fill="#15171a"/><circle cx="21" cy="16.5" r="1" fill="#15171a"/>
+  </g>
+  <text class="hdr" x="866" y="241">Homelab</text>
+  <text class="s" x="866" y="259">Proxmox × 2 · background, 24/7</text>
+
+  <!-- Leo -->
+  <rect class="box" x="840" y="280" width="330" height="190" rx="10"/>
+  <g transform="translate(857,296)">
+    <path d="M3,0 H23 A3,3 0 0 1 26,3 V16 A3,3 0 0 1 23,19 H11 L5,24 V19 H3 A3,3 0 0 1 0,16 V3 A3,3 0 0 1 3,0 Z" fill="#2f8f5b"/>
+    <circle cx="8" cy="9.5" r="1.6" fill="#fff"/><circle cx="13" cy="9.5" r="1.6" fill="#fff"/><circle cx="18" cy="9.5" r="1.6" fill="#fff"/>
+  </g>
+  <text class="t" x="894" y="313">Leo · Hermes Agent</text>
+  <text class="mono" x="1156" y="302" text-anchor="end">LXC · Srv1</text>
+  <text class="s" x="857" y="344">GPT-6 Luna via openai-codex</text>
+  <text class="s" x="857" y="363">persistent memory · tools · profiles</text>
+  <text class="s" x="857" y="382">my phone assistant, co-equal with Jarvis</text>
+  <line x1="857" y1="400" x2="1153" y2="400" stroke="#d9dcd6"/>
+  <text class="xs" x="857" y="422">Porunga doctrine projected into its SOUL</text>
+  <text class="mono" x="857" y="440">by hermes-bridge · checked by watchdog</text>
+
+  <!-- Vault replica -->
+  <rect class="box" x="840" y="560" width="330" height="90" rx="10"/>
+  <g transform="translate(857,572)">
+    <path d="M12,0 L23,8 L19,25 L5,25 L1,8 Z" fill="none" stroke="#7c5cff" stroke-width="1.6"/>
+  </g>
+  <text class="t" x="888" y="590">Vault replica</text>
+  <text class="s" x="857" y="615">the same vault, synced live</text>
+  <text class="s" x="857" y="633">Leo reads and writes it</text>
+
+  <!-- Routines -->
+  <rect class="box" x="840" y="690" width="330" height="66" rx="10"/>
+  <g transform="translate(857,710)" fill="none" stroke="#2f8f5b" stroke-width="1.6" stroke-linecap="round">
+    <circle cx="12" cy="12" r="11"/><path d="M12,5 V12 L17,15"/>
+  </g>
+  <text class="t" x="893" y="718">Background routines</text>
+  <text class="s" x="893" y="738">Brief · Watchtower · Coolify</text>
+
+  <!-- Infra -->
+  <rect class="box" x="840" y="780" width="160" height="72" rx="10"/>
+  <text class="t2" x="855" y="803">Srv1 · infra</text>
+  <text class="xs" x="855" y="822">OPNsense · CF Tunnel</text>
+  <text class="xs" x="855" y="838">AdGuard · Caddy · PBS</text>
+  <rect class="box" x="1010" y="780" width="160" height="72" rx="10"/>
+  <text class="t2" x="1025" y="803">Srv2 · apps</text>
+  <text class="xs" x="1025" y="822">Coolify · PostgreSQL</text>
+  <text class="xs" x="1025" y="838">dev · staging</text>
+
+  <!-- ============ BOTTOM ============ -->
+  <path class="arr" d="M345,790 V898" marker-end="url(#a)"/>
+  <text class="lbl" x="355" y="850">git push · code canon</text>
+  <rect class="box" x="40" y="900" width="610" height="62" rx="10"/>
+  <g transform="translate(58,917)" fill="none" stroke="#15171a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M8,2 L2,13 L8,24 M20,2 L26,13 L20,24"/><line x1="16" y1="3" x2="12" y2="23"/>
+  </g>
+  <text class="t" x="98" y="926">GitHub</text>
+  <text class="s" x="98" y="945">Porunga · client repos · history — mirrored for Leo</text>
+
+  <path class="arr" d="M1170,723 H1186 V898" marker-end="url(#a)"/>
+  <text class="lbl" x="1178" y="888" text-anchor="end">reports</text>
+  <rect class="box" x="810" y="900" width="390" height="62" rx="10"/>
+  <g transform="translate(828,917)" fill="none" stroke="#15171a" stroke-width="1.6" stroke-linejoin="round">
+    <rect x="1" y="0" width="22" height="26" rx="3"/><path d="M7,19 V7 L17,19 V7"/>
+  </g>
+  <text class="t" x="866" y="926">Notion · archive</text>
+  <text class="s" x="866" y="945">briefs · watchtower · session recaps</text>
+  <!-- Cross links -->
+  <path class="arr" d="M617,425 H838" marker-end="url(#a)"/>
+  <text class="lbl halo-ts" x="727" y="415" text-anchor="middle">leo · second opinion</text>
+  <path class="arr" d="M838,462 H652" marker-end="url(#a)"/>
+  <text class="lbl halo-ts" x="745" y="480" text-anchor="middle">SSH · /leo window, expiring</text>
+  <path class="arr" d="M617,605 H838" marker-start="url(#a)" marker-end="url(#a)"/>
+  <text class="lbl halo-ts" x="727" y="595" text-anchor="middle">Syncthing · live, both ways</text>
+
+  <!-- Telegram (drawn last, on top) -->
+  <path class="arr" d="M770,122 H1120 V278" marker-end="url(#a)"/>
+</svg>
+</div>
+</div>
+
+</body></html>

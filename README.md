@@ -14,7 +14,7 @@
   <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/obsidian.svg" width="30" title="Obsidian vault — the memory" alt="Obsidian" />&nbsp;&nbsp;
   <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/github.svg" width="30" title="git — the canon" alt="GitHub" />&nbsp;&nbsp;
   <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/python.svg" width="30" title="Python — engine & evals" alt="Python" />&nbsp;&nbsp;
-  <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/telegram.svg" width="30" title="Telegram — Leo, the contrarian" alt="Telegram" />&nbsp;&nbsp;
+  <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/telegram.svg" width="30" title="Telegram — Leo, the co-equal majordomo" alt="Telegram" />&nbsp;&nbsp;
   <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/notion.svg" width="30" title="Notion — disposable mirror" alt="Notion" />
 </p>
 
@@ -51,18 +51,9 @@ mirrored nightly to a private git repository, which is **the canon**: when vault
 and Notion disagree, git wins. Notion is a throwaway mirror for quick mobile consultation —
 handy, but never an authoritative source. The brain doesn't move; the runtimes and harnesses are swappable.
 
-```mermaid
-flowchart TD
-    Me(["Me — edit as a human"]) -->|write| V["Obsidian vault (.md)<br/>atelier + live memory"]
-    V -->|"@import · HOT"| J["JARVIS<br/>Claude Code & Antigravity CLI · Mac · builder"]
-    V -->|"memory-sync · nightly"| G[("git = THE CANON<br/>dated · versioned · append-only")]
-    J -->|"session recaps"| N["Notion<br/>disposable mirror · mobile"]
-    J <-->|"debate (§15) · I decide"| L["LEO<br/>Hermes · Telegram · contrarian"]
-    G -->|"read-only clone"| L
-    G -.->|"read-only"| A["ALFRED<br/>homelab Proxmox LXC 205 · sysadmin"]
-    classDef canon fill:#1f2937,stroke:#f59e0b,color:#fff;
-    class G canon;
-```
+<p align="center">
+  <a href="docs/assets/setup-map.html"><img src="docs/assets/setup-map.png" alt="Setup map: a MacBook running Orca, Claude Code (Jarvis) and Codex on the Porunga repo and Obsidian vault, linked over Tailscale to a Proxmox homelab running Leo (Hermes Agent), a live vault replica and background routines; GitHub holds the code canon, Notion the archive." width="100%" /></a>
+</p>
 
 ## What this demonstrates (engineering)
 
@@ -73,7 +64,7 @@ flowchart TD
 |---|---|
 | Tiered **HOT / WARM / COLD** memory + **path-scoped rules** + **cross-agent bridges** ([`AGENTS.md`](./AGENTS.md)) | **Context engineering** — managing token budget deliberately instead of dumping everything in. Multi-harness projection keeps doctrine identical across Claude Code, Google Antigravity CLI, Hermes, and Codex. |
 | **Hybrid retrieval** ([`bin/vault-search-v2.py`](./bin/vault-search-v2.py)) + **Post-RAG architectural pivot** | **Retrieval / RAG** — dense vectors (`sqlite-vec` + e5) fused with FTS5 keyword recall via Reciprocal Rank Fusion, with a refuse-to-answer similarity gate. AND senior judgment: knowing when vector RAG is needed vs when structured Markdown indexes + `ripgrep` offer superior speed (<10 ms), zero dependencies, and complete determinism. |
-| Jarvis / Leo / Alfred across **deliberately different model families** | **Multi-agent orchestration** — role *and* model diversity so agents don't share blind spots: Claude/Antigravity builder, open-weights Hermes contrarian, scoped homelab sysadmin. One debates, the human decides. |
+| Jarvis / Leo / Alfred across **deliberately different model families** | **Multi-agent orchestration** — role *and* model diversity so agents don't share blind spots: Claude-lineage Jarvis, GPT-lineage Leo (Hermes Agent), scoped homelab sysadmin. One debates, the human decides. |
 | **Notable Delivery Contract** ([`bin/jarvis-ship-check.py`](./bin/jarvis-ship-check.py)) | **Delivery engineering & QA** — moving beyond "it compiles": pre-code hypothesis audits, vertical observable slices with verifiable E2E proof, and independent review in fresh context before calling a feature "ready". |
 | Doctrine evaluation harness ([`tests/doctrine/`](./tests/doctrine)) | **LLM evaluation** — assistant behaviour tested against 14 scenarios across 6 categories, not assumed correct: weighted scoring, category aggregation, **regression detection vs previous run**, non-zero exit gating CI. |
 | "No background cron calls the LLM", deterministic token observability ([`bin/jarvis-token-report`](./bin/jarvis-token-report)) | **LLMOps & cost control** — every inference is intentional. Prompt caching hit ratio (targeting >80%) and token usage measured deterministically with 0 network calls and 0 LLM queries. |
@@ -92,7 +83,7 @@ don't share blind spots. Jarvis and Leo debate; **I decide**.
 | Agent | Where | Role | Runs on |
 |---|---|---|---|
 | **Jarvis** | terminal & IDE (macOS) | **Builder** — writes code, runs routines, edits the vault. Commits locally; never pushes/deploys without explicit confirmation. | [Claude Code](https://claude.com/claude-code) & [Antigravity CLI](https://github.com/google/antigravity) |
-| **Leo** | phone (Telegram) | **Contrarian** — reads the canon read-only, answers with verdicts (*validated / with-reservations / not-validated*), not flattery. | self-hosted [Hermes](https://nousresearch.com) (open weights) |
+| **Leo** | phone (Telegram) · homelab LXC | **Co-equal majordomo** — same doctrine (projected into its SOUL), reads and writes the live vault replica. Challenges on demand or when it sees a real risk, with verdicts (*validated / with-reservations / not-validated*), not flattery. | [Hermes Agent](https://nousresearch.com) on GPT-6 Luna (`openai-codex`) |
 | **Alfred** | homelab (Proxmox LXC 205) | **Sysadmin** — ops only, narrow blast radius. | scoped local model |
 
 ## Features
