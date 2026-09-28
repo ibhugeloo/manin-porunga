@@ -10,12 +10,14 @@
 
 <p align="center">
   <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/claude-ai.svg" width="30" title="Claude Code" alt="Claude" />&nbsp;&nbsp;
-  <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/google.svg" width="30" title="Google Antigravity CLI (agy)" alt="Antigravity" />&nbsp;&nbsp;
+  <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/openai.svg" width="30" title="Codex — second harness, same doctrine" alt="Codex" />&nbsp;&nbsp;
   <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/obsidian.svg" width="30" title="Obsidian vault — the memory" alt="Obsidian" />&nbsp;&nbsp;
   <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/github.svg" width="30" title="git — the canon" alt="GitHub" />&nbsp;&nbsp;
   <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/python.svg" width="30" title="Python — engine & evals" alt="Python" />&nbsp;&nbsp;
+  <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/tailscale.svg" width="30" title="Tailscale — Mac ↔ homelab mesh" alt="Tailscale" />&nbsp;&nbsp;
+  <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/proxmox.svg" width="30" title="Proxmox — homelab, background 24/7" alt="Proxmox" />&nbsp;&nbsp;
   <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/telegram.svg" width="30" title="Telegram — Leo, the co-equal majordomo" alt="Telegram" />&nbsp;&nbsp;
-  <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/notion.svg" width="30" title="Notion — disposable mirror" alt="Notion" />
+  <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/notion.svg" width="30" title="Notion — archive of machine outputs" alt="Notion" />
 </p>
 
 <p align="center">
@@ -48,8 +50,10 @@ files you already own.
 The brain is an [Obsidian](https://obsidian.md) vault: the same files I read and write as a
 human *are* the assistant's memory — no export pipeline, no drift. The vault is
 mirrored nightly to a private git repository, which is **the canon**: when vault, laptop
-and Notion disagree, git wins. Notion is a throwaway mirror for quick mobile consultation —
-handy, but never an authoritative source. The brain doesn't move; the runtimes and harnesses are swappable.
+and Notion disagree, git wins. A live replica of the vault (Syncthing over Tailscale) sits
+in the homelab, so the second majordomo reads and writes the same memory. Notion is only
+the archive for machine outputs — briefs, watchtower reports, session recaps — never an
+authoritative source. The brain doesn't move; the runtimes and harnesses are swappable.
 
 <p align="center">
   <a href="docs/assets/setup-map.html"><img src="docs/assets/setup-map.png" alt="Setup map: a MacBook running Orca, Claude Code (Jarvis) and Codex on the Porunga repo and Obsidian vault, linked over Tailscale to a Proxmox homelab running Leo (Hermes Agent), a live vault replica and background routines; GitHub holds the code canon, Notion the archive." width="100%" /></a>
@@ -62,9 +66,9 @@ handy, but never an authoritative source. The brain doesn't move; the runtimes a
 
 | Component in this repo | AI-engineering competency |
 |---|---|
-| Tiered **HOT / WARM / COLD** memory + **path-scoped rules** + **cross-agent bridges** ([`AGENTS.md`](./AGENTS.md)) | **Context engineering** — managing token budget deliberately instead of dumping everything in. Multi-harness projection keeps doctrine identical across Claude Code, Google Antigravity CLI, Hermes, and Codex. |
+| Tiered **HOT / WARM / COLD** memory + **path-scoped rules** + **cross-agent bridges** ([`AGENTS.md`](./AGENTS.md)) | **Context engineering** — managing token budget deliberately instead of dumping everything in. Multi-harness projection keeps doctrine identical across Claude Code, Codex and Hermes. |
 | **Hybrid retrieval** ([`bin/vault-search-v2.py`](./bin/vault-search-v2.py)) + **Post-RAG architectural pivot** | **Retrieval / RAG** — dense vectors (`sqlite-vec` + e5) fused with FTS5 keyword recall via Reciprocal Rank Fusion, with a refuse-to-answer similarity gate. AND senior judgment: knowing when vector RAG is needed vs when structured Markdown indexes + `ripgrep` offer superior speed (<10 ms), zero dependencies, and complete determinism. |
-| Jarvis / Leo / Alfred across **deliberately different model families** | **Multi-agent orchestration** — role *and* model diversity so agents don't share blind spots: Claude-lineage Jarvis, GPT-lineage Leo (Hermes Agent), scoped homelab sysadmin. One debates, the human decides. |
+| Jarvis / Leo across **deliberately different model families**, Orca-spawned harnesses | **Multi-agent orchestration** — two co-equal majordomos on distinct lineages so they don't share blind spots: Claude-lineage Jarvis (Claude Code, with Codex as a second harness under Orca), GPT-lineage Leo (Hermes Agent). Either can be asked to challenge the other; the human decides. |
 | **Notable Delivery Contract** ([`bin/jarvis-ship-check.py`](./bin/jarvis-ship-check.py)) | **Delivery engineering & QA** — moving beyond "it compiles": pre-code hypothesis audits, vertical observable slices with verifiable E2E proof, and independent review in fresh context before calling a feature "ready". |
 | Doctrine evaluation harness ([`tests/doctrine/`](./tests/doctrine)) | **LLM evaluation** — assistant behaviour tested against 14 scenarios across 6 categories, not assumed correct: weighted scoring, category aggregation, **regression detection vs previous run**, non-zero exit gating CI. |
 | "No background cron calls the LLM", deterministic token observability ([`bin/jarvis-token-report`](./bin/jarvis-token-report)) | **LLMOps & cost control** — every inference is intentional. Prompt caching hit ratio (targeting >80%) and token usage measured deterministically with 0 network calls and 0 LLM queries. |
@@ -77,14 +81,14 @@ handy, but never an authoritative source. The brain doesn't move; the runtimes a
 
 ## The staff
 
-One shared doctrine, three deliberately different jobs **and models** — so they
-don't share blind spots. Jarvis and Leo debate; **I decide**.
+One shared doctrine, two co-equal majordomos on **different model families** — so they
+don't share blind spots. Either can challenge the other on demand; **I decide**.
 
 | Agent | Where | Role | Runs on |
 |---|---|---|---|
-| **Jarvis** | terminal & IDE (macOS) | **Builder** — writes code, runs routines, edits the vault. Commits locally; never pushes/deploys without explicit confirmation. | [Claude Code](https://claude.com/claude-code) & [Antigravity CLI](https://github.com/google/antigravity) |
+| **Jarvis** | MacBook, spawned by [Orca](https://github.com/stablyai/orca) | **Builder** — writes code, runs routines, edits the vault (HOT / WARM memory). Commits locally; never pushes/deploys without explicit confirmation. Sub-agents on demand. | [Claude Code](https://claude.com/claude-code) (Opus 5.5 · hooks · MCP) |
+| **Codex** | MacBook, spawned by Orca | **Second harness** — same doctrine projected by `jarvis-codex-bridge` (`AGENTS.md` + skills), same memory, same skills. | [Codex](https://github.com/openai/codex) |
 | **Leo** | phone (Telegram) · homelab LXC | **Co-equal majordomo** — same doctrine (projected into its SOUL), reads and writes the live vault replica. Challenges on demand or when it sees a real risk, with verdicts (*validated / with-reservations / not-validated*), not flattery. | [Hermes Agent](https://nousresearch.com) on GPT-6 Luna (`openai-codex`) |
-| **Alfred** | homelab (Proxmox LXC 205) | **Sysadmin** — ops only, narrow blast radius. | scoped local model |
 
 ## Features
 
@@ -96,7 +100,7 @@ don't share blind spots. Jarvis and Leo debate; **I decide**.
   not because I said a magic word. File-path matching is mechanical and deterministic.
 - **Cross-harness portability** — standard [`AGENTS.md`](./AGENTS.md) + bridge scripts
   ([`bin/jarvis-antigravity-bridge`](./bin/jarvis-antigravity-bridge), [`bin/jarvis-codex-bridge`](./bin/jarvis-codex-bridge))
-  project the same single-source-of-truth doctrine into Claude Code, Antigravity CLI, and Codex.
+  project the same single-source-of-truth doctrine into Claude Code and Codex (Antigravity CLI kept as an optional target).
 - **Notable Delivery gate** — client work runs through `/jarvis-ship` and is validated
   mechanically by [`bin/jarvis-ship-check.py`](./bin/jarvis-ship-check.py): every feature in `feature_list.json`
   must be marked `done` AND carry demonstrable `evidence`.
