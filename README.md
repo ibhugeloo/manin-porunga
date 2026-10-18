@@ -48,11 +48,12 @@ Most setups bury memory in opaque vendor databases; this architecture keeps it i
 files you already own.
 
 The brain is an [Obsidian](https://obsidian.md) vault: the same files I read and write as a
-human *are* the assistant's memory — no export pipeline, no drift. The vault is
-mirrored nightly to a private git repository, which is **the canon**: when vault, laptop
-and Notion disagree, git wins. A live replica of the vault (Syncthing over Tailscale) sits
+human *are* the assistant's memory — no export pipeline, no drift. Code, docs and
+decisions live in a private git repository, which is **the canon**: on any divergence,
+git wins. The vault stays the single edit point for memory and is mirrored nightly into
+that repository as a versioned archive. A live replica of the vault (Syncthing over Tailscale) sits
 in the homelab, so the second majordomo reads and writes the same memory. Notion is only
-the archive for machine outputs — briefs, watchtower reports, session recaps — never an
+the archive for machine outputs — briefs, watchtower reports — never an
 authoritative source. The brain doesn't move; the runtimes and harnesses are swappable.
 
 <p align="center">
@@ -71,7 +72,7 @@ authoritative source. The brain doesn't move; the runtimes and harnesses are swa
 | Jarvis / Leo across **deliberately different model families**, Orca-spawned harnesses | **Multi-agent orchestration** — two co-equal majordomos on distinct lineages so they don't share blind spots: Claude-lineage Jarvis (Claude Code, with Codex as a second harness under Orca), GPT-lineage Leo (Hermes Agent). Either can be asked to challenge the other; the human decides. |
 | **Notable Delivery Contract** ([`bin/jarvis-ship-check.py`](./bin/jarvis-ship-check.py)) | **Delivery engineering & QA** — moving beyond "it compiles": pre-code hypothesis audits, vertical observable slices with verifiable E2E proof, and independent review in fresh context before calling a feature "ready". |
 | Doctrine evaluation harness ([`tests/doctrine/`](./tests/doctrine)) | **LLM evaluation** — assistant behaviour tested against 14 scenarios across 6 categories, not assumed correct: weighted scoring, category aggregation, **regression detection vs previous run**, non-zero exit gating CI. |
-| "No background cron calls the LLM", deterministic token observability ([`bin/jarvis-token-report`](./bin/jarvis-token-report)) | **LLMOps & cost control** — every inference is intentional. Prompt caching hit ratio (targeting >80%) and token usage measured deterministically with 0 network calls and 0 LLM queries. |
+| "No background cron on the laptop calls the LLM", deterministic token observability ([`bin/jarvis-token-report`](./bin/jarvis-token-report), kept as reference — retired from production in October 2026) | **LLMOps & cost control** — every inference is intentional. Prompt caching hit ratio (targeting >80%) and token usage measured deterministically with 0 network calls and 0 LLM queries. |
 | PreToolUse hooks, sequential state ops, memory boundaries ([`bin/jarvis-bash-guard.sh`](./bin/jarvis-bash-guard.sh), [`bin/jarvis-memory-guard.sh`](./bin/jarvis-memory-guard.sh)) | **AI safety & reliability** — mechanical guardrails around an autonomous agent: intercepts batched mutating git commands and `rm -rf`, enforces headless write-roots boundaries, and warns before "dumb zone" marathon sessions. |
 | Incident-forged, **dated** operating rules | **Production discipline** — real failures turned into enforced checks, not blog best-practices. |
 
@@ -98,9 +99,9 @@ don't share blind spots. Either can challenge the other on demand; **I decide**.
 - **Path-scoped rules** — a project's doctrine (target infra, deploy gotchas,
   "never DELETE in prod via API") loads *because I opened that project's directory*,
   not because I said a magic word. File-path matching is mechanical and deterministic.
-- **Cross-harness portability** — standard [`AGENTS.md`](./AGENTS.md) + bridge scripts
-  ([`bin/jarvis-antigravity-bridge`](./bin/jarvis-antigravity-bridge), [`bin/jarvis-codex-bridge`](./bin/jarvis-codex-bridge))
-  project the same single-source-of-truth doctrine into Claude Code and Codex (Antigravity CLI kept as an optional target).
+- **Cross-harness portability** — standard [`AGENTS.md`](./AGENTS.md) + [`bin/jarvis-codex-bridge`](./bin/jarvis-codex-bridge)
+  project the same single-source-of-truth doctrine into Claude Code and Codex
+  ([`bin/jarvis-antigravity-bridge`](./bin/jarvis-antigravity-bridge) kept as reference — retired from production in October 2026).
 - **Notable Delivery gate** — client work runs through `/jarvis-ship` and is validated
   mechanically by [`bin/jarvis-ship-check.py`](./bin/jarvis-ship-check.py): every feature in `feature_list.json`
   must be marked `done` AND carry demonstrable `evidence`.
@@ -114,12 +115,15 @@ don't share blind spots. Either can challenge the other on demand; **I decide**.
   `jarvis-memory-guard.sh` limits memory bloat, and `jarvis-context-watch.sh` warns before "dumb zone" sessions.
 - **Tested doctrine** — the assistant's policy rules live in `tests/doctrine/` as scenarios;
   the rules are *tested in CI*, not just written.
+- **Python engine** — in October 2026 the private runtime was rewritten from Bash into a
+  single unit-tested Python package (~14k lines); every historical script name became a
+  4-line launcher. This mirror keeps the standalone, runnable pieces.
 
 ## The memory model
 
 | Tier | When loaded | What goes there |
 |---|---|---|
-| **HOT** | every session (`@import` in `CLAUDE.md`, bridged to `AGENTS.md`/`GEMINI.md`) | persona (`SOUL`), user profile, active decisions, core operational workflows (<100 KB total) |
+| **HOT** | every session (`@import` in `CLAUDE.md`, bridged to `AGENTS.md`) | persona (`SOUL`), user profile, active decisions, core operational workflows (<100 KB total) |
 | **WARM** | on context match (cwd / path-scoped rules) | one file per project, domain, or infra runbook |
 | **COLD** | only on explicit request | historical archives, past incident post-mortems, raw session logs |
 | **path-scoped** | mechanically, when opening matching code | project-specific client/infra rules (`claude-config/rules/`) |
