@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/logo-manin.png" width="140" alt="Manin Porunga" />
+  <img src="docs/assets/porunga-logo-512.png" width="140" alt="Manin Porunga" />
 </p>
 
 <h1 align="center">Manin Porunga</h1>

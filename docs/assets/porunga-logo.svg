@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs>
+<linearGradient id="bga" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#D9402F"/><stop offset="1" stop-color="#7E1712"/></linearGradient>
+<linearGradient id="sha" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".12"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/></linearGradient>
+<linearGradient id="tra" gradientUnits="userSpaceOnUse" x1="8" y1="58" x2="40" y2="24"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#fff" stop-opacity=".85"/></linearGradient>
+<filter id="gla" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.2"/></filter>
+<clipPath id="cpa"><rect width="64" height="64" rx="14"/></clipPath></defs><g clip-path="url(#cpa)"><rect width="64" height="64" fill="url(#bga)"/><path d="M6 60 C18 58 14 42 26 40 C36 38 32 28 40 24" fill="none" stroke="url(#tra)" stroke-width="9" stroke-linecap="round" opacity=".55"/>
+<path d="M6 60 C18 58 14 42 26 40 C36 38 32 28 40 24" fill="none" stroke="url(#tra)" stroke-width="3" stroke-linecap="round"/>
+<circle cx="40" cy="24" r="9" fill="#fff" opacity=".55" filter="url(#gla)"/>
+<path d="M40 11 Q40 24 53 24 Q40 24 40 37 Q40 24 27 24 Q40 24 40 11Z" fill="#fff"/><rect width="64" height="64" fill="url(#sha)"/></g></svg>
